@@ -176,6 +176,7 @@ fn pacstrap(sail: &Sail) -> Result<()> {
     let base = [
         "base",
         "base-devel",
+        "dosfstools",
         "efibootmgr",
         "grub",
         "git",
@@ -259,8 +260,8 @@ fn system_configuration(sail: &Sail) -> Result<()> {
     let efi_part = &sail.get_efi_part()?;
     let StdoutTrimmed(uuid) = run_result!(%"blkid -s UUID -o value", efi_part)?;
     let fstab_efi_path = format!("/boot/efis/{}", sail.get_efi_last_path()?);
-    let fstab_efi_path = format!("{} {} {}", uuid, fstab_efi_path, "vfat x-systemd.idle-timeout=1min,x-systemd.automount,noauto,umask=0022,fmask=0022,dmask=0022 0 1");
-    let fstab_efi_path2 = format!("{} {}", uuid, "/boot/efi vfat x-systemd.idle-timeout=1min,x-systemd.automount,noauto,umask=0022,fmask=0022,dmask=0022 0 1");
+    let fstab_efi_path = format!("UUID={} {} {}", uuid, fstab_efi_path, "vfat x-systemd.idle-timeout=1min,x-systemd.automount,noauto,umask=0022,fmask=0022,dmask=0022 0 1");
+    let fstab_efi_path2 = format!("UUID={} {}", uuid, "/boot/efi vfat x-systemd.idle-timeout=1min,x-systemd.automount,noauto,umask=0022,fmask=0022,dmask=0022 0 1");
 
     writeln!(fstab, "{}\n{}", fstab_efi_path, fstab_efi_path2)?;
 
@@ -494,8 +495,24 @@ fn bootloaders(sail: &Sail) -> Result<()> {
 
 fn finishing() -> Result<()> {
     let duration = time::Duration::from_secs(1);
-    let post_scripts_path = "/mnt/root/post_install_scripts";
 
+    eprintln!("\nEnable networkmanager service unit...\n");
+    let arch_chroot = Split("arch-chroot /mnt bash --login");
+    let nm_enable = [
+        "systemctl enable NetworkManager",
+        ].concat();
+    run_result!(&arch_chroot, Stdin(nm_enable))?;
+
+    eprintln!("\nAdd wheel to sudoers...\n");
+    let wheel_sudo = "%wheel ALL=(ALL) ALL";
+    let mut sudoers = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open("/mnt/etc/sudoers")?;
+
+    writeln!(sudoers, "{}", wheel_sudo)?;
+
+    let post_scripts_path = "/mnt/root/post_install_scripts";
     eprintln!("\nGenerating script post installation...\n");
     run_result!(%"mkdir -p", post_scripts_path)?;
 
@@ -545,6 +562,7 @@ fn finishing() -> Result<()> {
 
     eprintln!("\nExport pools...\n");
     run_result!(%"zpool export bpool")?;
+    thread::sleep(duration);
     run_result!(%"zpool export rpool")?;
 
     Ok(())
@@ -561,19 +579,18 @@ fn main() -> Result<()> {
 
     command_checker()?;
     check_as_root()?;
-    // partition_disk(&sail)?;
-    // format_disk(&sail)?;
-    // pacstrap(&sail)?;
-    // system_configuration(&sail)?;
-    // install_aurs()?;
-    // workarounds()?;
-    // bootloaders(&sail)?;
+    partition_disk(&sail)?;
+    format_disk(&sail)?;
+    pacstrap(&sail)?;
+    system_configuration(&sail)?;
+    install_aurs()?;
+    workarounds()?;
+    bootloaders(&sail)?;
     finishing()?;
 
     // TODO: check if using hdd or ssd
     // TODO: schedule scrub and trim using timer or cron
     // TODO: configure zrepl
-    // TODO: efi and efis mount problem
-    // TODO: add wheel to sudoers.conf
+    // TODO: enable networkmanager post_scripts
     Ok(())
 }

@@ -124,8 +124,8 @@ impl Sail {
     }
 
     pub fn get_next_partnum(&self) -> usize {
-        // self.next_partnum
-        1
+        self.next_partnum
+        // 1
     }
 
     fn _get_next_partnum(disk: &str) -> Result<usize> {
