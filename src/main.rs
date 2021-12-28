@@ -2,7 +2,7 @@ mod sail;
 
 use crate::sail::Sail;
 use anyhow::{bail, Context, Result};
-use cradle::input::{Stdin, Split};
+use cradle::input::{Split, Stdin};
 use cradle::output::StdoutTrimmed;
 use cradle::prelude::*;
 use sail::{LinuxVariant, ZfsType};
@@ -254,7 +254,11 @@ fn pacstrap(sail: &Sail) -> Result<()> {
 
 fn system_configuration(sail: &Sail) -> Result<()> {
     eprintln!("\nSet mkinitcpio zfs hook scan path...\n");
-    let cmdline = format!(r#"{}GRUB_CMDLINE_LINUX="zfs_import_dir={}""#, "GRUB_DISABLE_OS_PROBER=false\n", sail.get_disk_parent()?);
+    let cmdline = format!(
+        r#"{}GRUB_CMDLINE_LINUX="zfs_import_dir={}""#,
+        "GRUB_DISABLE_OS_PROBER=false\n",
+        sail.get_disk_parent()?
+    );
     let mut grub_default = OpenOptions::new()
         .append(true)
         .open("/mnt/etc/default/grub")?;
@@ -309,15 +313,19 @@ fn system_configuration(sail: &Sail) -> Result<()> {
 
     eprintln!("\nIgnore kernel update...\n");
     run_result!(%"sed -i", "s/#IgnorePkg/IgnorePkg/", "/mnt/etc/pacman.conf")?;
-    let exp = format!("/^IgnorePkg/ s/$/ {linux} {linux}-headers zfs-{linux} zfs-utils/", linux=sail.get_linvar());
+    let exp = format!(
+        "/^IgnorePkg/ s/$/ {linux} {linux}-headers zfs-{linux} zfs-utils/",
+        linux = sail.get_linvar()
+    );
     run_result!(%"sed -i", exp, "/mnt/etc/pacman.conf")?;
 
     eprintln!("\nGenerate kernel_updater script in /usr/local/bin...\n");
-    let script = "\
-        #!/bin/bash\n\
-        \n\
-        INST_LINVAR=$(sed 's|.*linux|linux|' /proc/cmdline | sed 's|.img||g' | awk '{ print $1 }')\n\
-        pacman -Sy --needed --noconfirm ${INST_LINVAR} ${INST_LINVAR}-headers zfs-${INST_LINVAR} zfs-utils";
+    let script = r"
+#!/bin/bash
+
+INST_LINVAR=$(sed 's|.*linux|linux|' /proc/cmdline | sed 's|.img||g' | awk '{ print $1 }')
+pacman -Sy --needed --noconfirm ${INST_LINVAR} ${INST_LINVAR}-headers zfs-${INST_LINVAR} zfs-utils
+";
     let mut script_file = OpenOptions::new()
         .write(true)
         .create(true)
@@ -362,12 +370,13 @@ fn system_configuration(sail: &Sail) -> Result<()> {
         .append(true)
         .create(true)
         .open("/mnt/etc/pacman.conf")?;
-    let archzfs_repo = "\n\
-        #[archzfs-testing]\n\
-        #Include = /etc/pacman.d/mirrorlist-archzfs\n\
-        \n\
-        [archzfs]\n\
-        Include = /etc/pacman.d/mirrorlist-archzfs";
+    let archzfs_repo = r"
+#[archzfs-testing]
+#Include = /etc/pacman.d/mirrorlist-archzfs
+
+[archzfs]
+Include = /etc/pacman.d/mirrorlist-archzfs
+";
 
     writeln!(pacman_conf, "{}", archzfs_repo)?;
 
@@ -378,8 +387,7 @@ fn install_aurs() -> Result<()> {
     let arch_chroot = Split("arch-chroot /mnt bash --login");
 
     eprintln!("\nInstall paru...\n");
-    let paru_install =
-r"
+    let paru_install = r"
 echo 'nobody ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/00_nobody
 su - nobody -s /bin/bash
 mkdir /tmp/build
@@ -392,8 +400,7 @@ Y
     run_result!(&arch_chroot, Stdin(paru_install))?;
 
     eprintln!("\nInstall boot environment manager...\n");
-    let bieaz_install =
-r"
+    let bieaz_install = r"
 su - nobody -s /bin/bash
 mkdir /tmp/build
 cd /tmp/build
@@ -402,8 +409,7 @@ cd bieaz
 makepkg -si
 Y
 ";
-    let bem_install =
-r"
+    let bem_install = r"
 su - nobody -s /bin/bash
 mkdir /tmp/build
 cd /tmp/build
@@ -416,8 +422,7 @@ Y
     run_result!(&arch_chroot, Stdin(bem_install))?;
 
     eprintln!("\nInstall zrepl auto snapshot...\n");
-    let zrepl_install =
-r"
+    let zrepl_install = r"
 su - nobody -s /bin/bash
 mkdir /tmp/build
 cd /tmp/build
@@ -435,8 +440,7 @@ Y
         .create(true)
         .truncate(true)
         .open("/mnt/etc/zrepl/zrepl.yml")?;
-    let conf =
-r#"
+    let conf = r#"
 jobs:
 
 - name: snapjob
@@ -487,7 +491,8 @@ fn workarounds() -> Result<()> {
     writeln!(sudoers, "{}", env_keep)?;
 
     eprintln!("\nPool name missing fix...\n");
-    let exp = r"s/rpool=.*/rpool=`zdb -l ${GRUB_DEVICE} | grep -E '[[:blank:]]name' | cut -d\\' -f 2`/";
+    let exp =
+        r"s/rpool=.*/rpool=`zdb -l ${GRUB_DEVICE} | grep -E '[[:blank:]]name' | cut -d\\' -f 2`/";
 
     run_result!(%"sed -i", exp, "/mnt/etc/grub.d/10_linux")?;
 
@@ -498,8 +503,7 @@ fn bootloaders(sail: &Sail) -> Result<()> {
     let arch_chroot = Split("arch-chroot /mnt bash --login");
 
     eprintln!("\nGenerate initrd...\n");
-    let cmd =
-r"
+    let cmd = r"
 rm -f /etc/zfs/zpool.cache
 touch /etc/zfs/zpool.cache
 chmod a-w /etc/zfs/zpool.cache
@@ -512,25 +516,21 @@ mkinitcpio -P
     run_result!(%"mkdir -p /mnt/boot/efi/EFI/arch")?;
     run_result!(%"mkdir -p /mnt/boot/grub")?;
 
-    // eprintln!("\nInstall grub bios...\n");
-    // let cmd = "grub-install --boot-directory /boot/efi/EFI/arch --target=i386-pc ".to_owned() + &sail.disk;
-    // run_result!(&arch_chroot, Stdin(cmd))?;
-
     eprintln!("\nInstall grub efi...\n");
     let cmd = format!(
-r#"
+        r#"
 grub-install --boot-directory /boot/efi/EFI/arch --efi-directory /boot/efi/
 grub-install --boot-directory /boot/efi/EFI/arch --efi-directory /boot/efi/ --removable
 efibootmgr -cgp 1 -l "\EFI\arch\grubx64.efi" -L "arch-{}" -d {}
 "#,
-sail.get_disk_last_path()?,
-sail.get_disk());
+        sail.get_disk_last_path()?,
+        sail.get_disk()
+    );
 
     run_result!(&arch_chroot, Stdin(cmd))?;
 
     eprintln!("\nGenerate grub menu...\n");
-    let cmd =
-r"
+    let cmd = r"
 grub-mkconfig -o /boot/efi/EFI/arch/grub/grub.cfg
 cp /boot/efi/EFI/arch/grub/grub.cfg /boot/grub/grub.cfg
 ";
@@ -538,8 +538,7 @@ cp /boot/efi/EFI/arch/grub/grub.cfg /boot/grub/grub.cfg
     run_result!(&arch_chroot, Stdin(cmd))?;
 
     eprintln!("\nMirror esp content...\n");
-    let cmd =
-r"
+    let cmd = r"
 ESP_MIRROR=$(mktemp -d)
 cp -r /boot/efi/EFI $ESP_MIRROR
 for i in /boot/efis/*; do
@@ -557,8 +556,7 @@ fn finishing() -> Result<()> {
 
     eprintln!("\nEnable networkmanager service unit...\n");
     let arch_chroot = Split("arch-chroot /mnt bash --login");
-    let nm_enable =
-r"
+    let nm_enable = r"
 systemctl enable NetworkManager
 systemctl enable zrepl
 ";
@@ -582,8 +580,7 @@ systemctl enable zrepl
         .create(true)
         .truncate(true)
         .open([post_scripts_path, "/addt_data_pools.sh"].concat())?;
-    let data_pools =
-r#"
+    let data_pools = r#"
 DATA_POOL='tank0 tank1'
 
 # tab-separated zfs properties
@@ -603,8 +600,7 @@ done
         .create(true)
         .truncate(true)
         .open([post_scripts_path, "/add_user.sh"].concat())?;
-    let add_user =
-r"
+    let add_user = r"
 myUser=UserName
 useradd -m -G wheel -s /bin/zsh ${myUser}
 passwd ${myUser}
