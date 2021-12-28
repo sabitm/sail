@@ -378,50 +378,54 @@ fn install_aurs() -> Result<()> {
     let arch_chroot = Split("arch-chroot /mnt bash --login");
 
     eprintln!("\nInstall paru...\n");
-    let paru_install = [
-        "echo 'nobody ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/00_nobody\n",
-        "su - nobody -s /bin/bash\n",
-        "mkdir /tmp/build\n",
-        "cd /tmp/build\n",
-        "git clone https://aur.archlinux.org/paru-bin.git\n",
-        "cd paru-bin\n",
-        "makepkg -si\n",
-        "Y\n",
-        ].concat();
+    let paru_install =
+r"
+echo 'nobody ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/00_nobody
+su - nobody -s /bin/bash
+mkdir /tmp/build
+cd /tmp/build
+git clone https://aur.archlinux.org/paru-bin.git
+cd paru-bin
+makepkg -si
+Y
+";
     run_result!(&arch_chroot, Stdin(paru_install))?;
 
     eprintln!("\nInstall boot environment manager...\n");
-    let bieaz_install = [
-        "su - nobody -s /bin/bash\n",
-        "mkdir /tmp/build\n",
-        "cd /tmp/build\n",
-        "git clone https://aur.archlinux.org/bieaz.git\n",
-        "cd bieaz\n",
-        "makepkg -si\n",
-        "Y\n",
-        ].concat();
-    let bem_install = [
-        "su - nobody -s /bin/bash\n",
-        "mkdir /tmp/build\n",
-        "cd /tmp/build\n",
-        "git clone https://aur.archlinux.org/rozb3-pac.git\n",
-        "cd rozb3-pac\n",
-        "makepkg -si\n",
-        "Y\n",
-        ].concat();
+    let bieaz_install =
+r"
+su - nobody -s /bin/bash
+mkdir /tmp/build
+cd /tmp/build
+git clone https://aur.archlinux.org/bieaz.git
+cd bieaz
+makepkg -si
+Y
+";
+    let bem_install =
+r"
+su - nobody -s /bin/bash
+mkdir /tmp/build
+cd /tmp/build
+git clone https://aur.archlinux.org/rozb3-pac.git
+cd rozb3-pac
+makepkg -si
+Y
+";
     run_result!(&arch_chroot, Stdin(bieaz_install))?;
     run_result!(&arch_chroot, Stdin(bem_install))?;
 
     eprintln!("\nInstall zrepl auto snapshot...\n");
-    let zrepl_install = [
-        "su - nobody -s /bin/bash\n",
-        "mkdir /tmp/build\n",
-        "cd /tmp/build\n",
-        "git clone https://aur.archlinux.org/zrepl-bin.git\n",
-        "cd zrepl-bin\n",
-        "makepkg -si\n",
-        "Y\n",
-        ].concat();
+    let zrepl_install =
+r"
+su - nobody -s /bin/bash
+mkdir /tmp/build
+cd /tmp/build
+git clone https://aur.archlinux.org/zrepl-bin.git
+cd zrepl-bin
+makepkg -si
+Y
+";
     run_result!(&arch_chroot, Stdin(zrepl_install))?;
 
     eprintln!("\nGenerate zrepl configuration...\n");
@@ -494,13 +498,14 @@ fn bootloaders(sail: &Sail) -> Result<()> {
     let arch_chroot = Split("arch-chroot /mnt bash --login");
 
     eprintln!("\nGenerate initrd...\n");
-    let cmd = [
-        "rm -f /etc/zfs/zpool.cache\n",
-        "touch /etc/zfs/zpool.cache\n",
-        "chmod a-w /etc/zfs/zpool.cache\n",
-        "chattr +i /etc/zfs/zpool.cache\n",
-        "mkinitcpio -P\n",
-        ].concat();
+    let cmd =
+r"
+rm -f /etc/zfs/zpool.cache
+touch /etc/zfs/zpool.cache
+chmod a-w /etc/zfs/zpool.cache
+chattr +i /etc/zfs/zpool.cache
+mkinitcpio -P
+";
     run_result!(&arch_chroot, Stdin(cmd))?;
 
     eprintln!("\nCreate grub boot dir, in esp and boot pool...\n");
@@ -512,34 +517,35 @@ fn bootloaders(sail: &Sail) -> Result<()> {
     // run_result!(&arch_chroot, Stdin(cmd))?;
 
     eprintln!("\nInstall grub efi...\n");
-    let cmd = [
-        "grub-install --boot-directory /boot/efi/EFI/arch --efi-directory /boot/efi/\n",
-        "grub-install --boot-directory /boot/efi/EFI/arch --efi-directory /boot/efi/ --removable\n",
-        ].concat();
-    let cmd = format!(r#"{}efibootmgr -cgp 1 -l "\EFI\arch\grubx64.efi" -L "arch-{}" -d {}{}"#,
-              cmd,
-              sail.get_disk_last_path()?,
-              sail.get_disk(),
-              '\n');
+    let cmd = format!(
+r#"
+grub-install --boot-directory /boot/efi/EFI/arch --efi-directory /boot/efi/
+grub-install --boot-directory /boot/efi/EFI/arch --efi-directory /boot/efi/ --removable
+efibootmgr -cgp 1 -l "\EFI\arch\grubx64.efi" -L "arch-{}" -d {}
+"#,
+sail.get_disk_last_path()?,
+sail.get_disk());
 
     run_result!(&arch_chroot, Stdin(cmd))?;
 
     eprintln!("\nGenerate grub menu...\n");
-    let cmd = [
-        "grub-mkconfig -o /boot/efi/EFI/arch/grub/grub.cfg\n",
-        "cp /boot/efi/EFI/arch/grub/grub.cfg /boot/grub/grub.cfg\n",
-        ].concat();
+    let cmd =
+r"
+grub-mkconfig -o /boot/efi/EFI/arch/grub/grub.cfg
+cp /boot/efi/EFI/arch/grub/grub.cfg /boot/grub/grub.cfg
+";
 
     run_result!(&arch_chroot, Stdin(cmd))?;
 
     eprintln!("\nMirror esp content...\n");
-    let cmd = [
-        "ESP_MIRROR=$(mktemp -d)\n",
-        "cp -r /boot/efi/EFI $ESP_MIRROR\n",
-        "for i in /boot/efis/*; do\n",
-        "  cp -r $ESP_MIRROR/EFI $i\n",
-        "done\n",
-        ].concat();
+    let cmd =
+r"
+ESP_MIRROR=$(mktemp -d)
+cp -r /boot/efi/EFI $ESP_MIRROR
+for i in /boot/efis/*; do
+  cp -r $ESP_MIRROR/EFI $i
+done
+";
 
     run_result!(&arch_chroot, Stdin(cmd))?;
 
@@ -551,10 +557,11 @@ fn finishing() -> Result<()> {
 
     eprintln!("\nEnable networkmanager service unit...\n");
     let arch_chroot = Split("arch-chroot /mnt bash --login");
-    let nm_enable = [
-        "systemctl enable NetworkManager\n",
-        "systemctl enable zrepl\n",
-        ].concat();
+    let nm_enable =
+r"
+systemctl enable NetworkManager
+systemctl enable zrepl
+";
     run_result!(&arch_chroot, Stdin(nm_enable))?;
 
     eprintln!("\nAdd wheel to sudoers...\n");
@@ -575,21 +582,20 @@ fn finishing() -> Result<()> {
         .create(true)
         .truncate(true)
         .open([post_scripts_path, "/addt_data_pools.sh"].concat())?;
-    let data_pools = [
-        "DATA_POOL='tank0 tank1'\n",
-        "\n",
-        "# tab-separated zfs properties\n",
-        "# see /etc/zfs/zed.d/history_event-zfs-list-cacher.sh\n",
-        r"export \",
-        "\n",
-        r#"PROPS="name,mountpoint,canmount,atime,relatime,devices,exec\"#,
-        "\n",
-        r#",readonly,setuid,nbmand,encroot,keylocation""#,
-        "\n\n",
-        "for i in $DATA_POOL; do\n",
-        "zfs list -H -t filesystem -o $PROPS -r $i > /etc/zfs/zfs-list.cache/$i\n",
-        "done\n",
-    ].concat();
+    let data_pools =
+r#"
+DATA_POOL='tank0 tank1'
+
+# tab-separated zfs properties
+# see /etc/zfs/zed.d/history_event-zfs-list-cacher.sh
+export \
+PROPS="name,mountpoint,canmount,atime,relatime,devices,exec\
+,readonly,setuid,nbmand,encroot,keylocation"
+
+for i in $DATA_POOL; do
+  zfs list -H -t filesystem -o $PROPS -r $i > /etc/zfs/zfs-list.cache/$i
+done
+"#;
     writeln!(data_pools_path, "{}", data_pools)?;
 
     let mut add_user_path = OpenOptions::new()
@@ -597,11 +603,12 @@ fn finishing() -> Result<()> {
         .create(true)
         .truncate(true)
         .open([post_scripts_path, "/add_user.sh"].concat())?;
-    let add_user = [
-        "myUser=UserName\n",
-        "useradd -m -G wheel -s /bin/zsh ${myUser}\n",
-        "passwd ${myUser}\n",
-    ].concat();
+    let add_user =
+r"
+myUser=UserName
+useradd -m -G wheel -s /bin/zsh ${myUser}
+passwd ${myUser}
+";
     writeln!(add_user_path, "{}", add_user)?;
 
     thread::sleep(duration);
