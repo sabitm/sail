@@ -11,14 +11,31 @@ use std::{fs::OpenOptions, thread, time};
 
 fn command_checker() -> Result<()> {
     let commands = [
+        "arch-chroot",
+        "awk",
+        "bash",
+        "blkid",
         "chmod",
-        "id",
-        "mkfs.vfat",
+        "curl",
+        "genfstab",
+        "grep",
+        "hwclock",
         "mkdir",
+        "mkfs.vfat",
+        "modprobe",
         "mount",
+        "mv",
+        "pacman",
         "pacstrap",
+        "rm",
+        "sed",
         "sgdisk",
+        "systemctl",
+        "systemd-firstboot",
+        "umount",
+        "which",
         "zfs",
+        "zgenhostid",
         "zpool",
     ];
 
@@ -180,6 +197,7 @@ fn pacstrap(sail: &Sail) -> Result<()> {
         "efibootmgr",
         "grub",
         "git",
+        "htop",
         "mandoc",
         "mkinitcpio",
         "neovim",
@@ -406,6 +424,41 @@ fn install_aurs() -> Result<()> {
         ].concat();
     run_result!(&arch_chroot, Stdin(zrepl_install))?;
 
+    eprintln!("\nGenerate zrepl configuration...\n");
+    run_result!(%"mkdir -p /mnt/etc/zrepl")?;
+    let mut zrepl_conf_path = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("/mnt/etc/zrepl/zrepl.yml")?;
+    let conf =
+r#"
+jobs:
+
+- name: snapjob
+  type: snap
+  filesystems: {
+    "bpool/arch/BOOT": true,
+    "bpool/arch/BOOT/default": true,
+    "rpool/arch/DATA<": true,
+    "rpool/arch/ROOT": true,
+    "rpool/arch/ROOT/default": true,
+  }
+  snapshotting:
+    type: periodic
+    interval: 15m
+    prefix: zrepl_
+  pruning:
+    keep:
+    - type: grid
+      grid: 1x1h(keep=all) | 12x1h | 7x1d
+      regex: "^zrepl_.*"
+    - type: regex
+      negate: true
+      regex: "^zrepl_.*"
+"#;
+    writeln!(zrepl_conf_path, "{}", conf)?;
+
     eprintln!("\nDelete temporary user...\n");
     run_result!(%"rm /mnt/etc/sudoers.d/00_nobody")?;
 
@@ -499,7 +552,8 @@ fn finishing() -> Result<()> {
     eprintln!("\nEnable networkmanager service unit...\n");
     let arch_chroot = Split("arch-chroot /mnt bash --login");
     let nm_enable = [
-        "systemctl enable NetworkManager",
+        "systemctl enable NetworkManager\n",
+        "systemctl enable zrepl\n",
         ].concat();
     run_result!(&arch_chroot, Stdin(nm_enable))?;
 
