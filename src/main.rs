@@ -616,7 +616,6 @@ WantedBy=multi-user.target
     let arch_chroot = Split("arch-chroot /mnt bash --login");
     let nm_enable = r"
 systemctl enable NetworkManager
-systemctl enable zrepl
 systemctl enable zfs-scrub@rpool.timer
 systemctl enable zfs-scrub@bpool.timer
 ";
@@ -663,6 +662,12 @@ passwd ${myUser}
 ";
     writeln!(add_user_path, "{}", add_user)?;
 
+    let mut enable_services_path = openopt_write([post_scripts_path, "/enable_services.sh"].concat())?;
+    let enable_services = r"
+systemctl enable zrepl
+";
+    writeln!(enable_services_path, "{}", enable_services)?;
+
     thread::sleep(duration);
 
     eprintln!("\nSnapshot of clean installation...\n");
@@ -702,7 +707,5 @@ fn main() -> Result<()> {
     bootloaders(&sail)?;
     finishing(&sail)?;
 
-    // TODO: check if using hdd or ssd
-    // TODO: schedule scrub and trim using timer or cron
     Ok(())
 }
