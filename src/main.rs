@@ -554,11 +554,52 @@ done
 fn finishing() -> Result<()> {
     let duration = time::Duration::from_secs(1);
 
+    eprintln!("\nGenerate monthly scrub service...\n");
+    let mut scrub_timer_path = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("/mnt/etc/systemd/system/zfs-scrub@.timer")?;
+    let mut scrub_service_path = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open("/mnt/etc/systemd/system/zfs-scrub@.service")?;
+    let scrub_timer = r"
+[Unit]
+Description=Monthly zpool scrub on %i
+
+[Timer]
+OnCalendar=monthly
+AccuracySec=1h
+Persistent=true
+
+[Install]
+WantedBy=multi-user.target
+";
+    let scrub_service = r"
+[Unit]
+Description=zpool scrub on %i
+
+[Service]
+Nice=19
+IOSchedulingClass=idle
+KillSignal=SIGINT
+ExecStart=/usr/bin/zpool scrub %i
+
+[Install]
+WantedBy=multi-user.target
+";
+    writeln!(scrub_timer_path, "{}", scrub_timer)?;
+    writeln!(scrub_service_path, "{}", scrub_service)?;
+
     eprintln!("\nEnable networkmanager service unit...\n");
     let arch_chroot = Split("arch-chroot /mnt bash --login");
     let nm_enable = r"
 systemctl enable NetworkManager
 systemctl enable zrepl
+systemctl enable zfs-scrub@rpool.timer
+systemctl enable zfs-scrub@bpool.timer
 ";
     run_result!(&arch_chroot, Stdin(nm_enable))?;
 
@@ -647,7 +688,5 @@ fn main() -> Result<()> {
 
     // TODO: check if using hdd or ssd
     // TODO: schedule scrub and trim using timer or cron
-    // TODO: configure zrepl
-    // TODO: enable networkmanager post_scripts
     Ok(())
 }
