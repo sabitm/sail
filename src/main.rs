@@ -5,8 +5,10 @@ use anyhow::{bail, Context, Result};
 use cradle::input::{Split, Stdin};
 use cradle::output::StdoutTrimmed;
 use cradle::prelude::*;
-use sail::{LinuxVariant, ZfsType};
+use sail::{LinuxVariant, ZfsType, StorageType};
+use std::fs::File;
 use std::io::Write;
+use std::path::Path;
 use std::{fs::OpenOptions, thread, time};
 
 fn command_checker() -> Result<()> {
@@ -54,6 +56,19 @@ fn check_as_root() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn openopt_write<P>(path: P) -> Result<File>
+where
+    P: AsRef<Path>,
+{
+    let openopt = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)?;
+    
+    Ok(openopt)
 }
 
 fn partition_disk(sail: &Sail) -> Result<()> {
@@ -266,11 +281,7 @@ fn system_configuration(sail: &Sail) -> Result<()> {
     writeln!(grub_default, "{}", cmdline)?;
 
     eprintln!("\nGenerate fstab...\n");
-    let mut fstab = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open("/mnt/etc/fstab")?;
+    let mut fstab = openopt_write("/mnt/etc/fstab")?;
 
     let StdoutTrimmed(fstab_out) = run_result!(%"genfstab -U /mnt")?;
     let StdoutTrimmed(fstab_out) =
@@ -339,11 +350,7 @@ pacman -Sy --needed --noconfirm ${INST_LINVAR} ${INST_LINVAR}-headers zfs-${INST
 
     eprintln!("\nApply locales...\n");
     let locales = "en_US.UTF-8 UTF-8";
-    let mut locale_file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open("/mnt/etc/locale.gen")?;
+    let mut locale_file = openopt_write("/mnt/etc/locale.gen")?;
 
     writeln!(locale_file, "{}", locales)?;
 
@@ -358,11 +365,7 @@ pacman -Sy --needed --noconfirm ${INST_LINVAR} ${INST_LINVAR}-headers zfs-${INST
     run_result!(%"arch-chroot /mnt pacman-key --lsign-key", sign_key)?;
 
     let StdoutTrimmed(mirrorlist) = run_result!(%"curl -L https://git.io/Jsfw2")?;
-    let mut mirrorlist_archzfs = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open("/mnt/etc/pacman.d/mirrorlist-archzfs")?;
+    let mut mirrorlist_archzfs = openopt_write("/mnt/etc/pacman.d/mirrorlist-archzfs")?;
     writeln!(mirrorlist_archzfs, "{}", mirrorlist)?;
 
     eprintln!("\nAdd archzfs repo...\n");
@@ -435,11 +438,7 @@ Y
 
     eprintln!("\nGenerate zrepl configuration...\n");
     run_result!(%"mkdir -p /mnt/etc/zrepl")?;
-    let mut zrepl_conf_path = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open("/mnt/etc/zrepl/zrepl.yml")?;
+    let mut zrepl_conf_path = openopt_write("/mnt/etc/zrepl/zrepl.yml")?;
     let conf = r#"
 jobs:
 
@@ -476,11 +475,7 @@ jobs:
 fn workarounds() -> Result<()> {
     eprintln!("\nGrub canonical path fix...\n");
     let canonical_fix = "export ZPOOL_VDEV_NAME_PATH=YES";
-    let mut zpool_vdev = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open("/mnt/etc/profile.d/zpool_vdev_name_path.sh")?;
+    let mut zpool_vdev = openopt_write("/mnt/etc/profile.d/zpool_vdev_name_path.sh")?;
     let env_keep = r#"Defaults env_keep += "ZPOOL_VDEV_NAME_PATH""#;
     let mut sudoers = OpenOptions::new()
         .append(true)
@@ -551,20 +546,12 @@ done
     Ok(())
 }
 
-fn finishing() -> Result<()> {
+fn finishing(sail: &Sail) -> Result<()> {
     let duration = time::Duration::from_secs(1);
 
     eprintln!("\nGenerate monthly scrub service...\n");
-    let mut scrub_timer_path = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open("/mnt/etc/systemd/system/zfs-scrub@.timer")?;
-    let mut scrub_service_path = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open("/mnt/etc/systemd/system/zfs-scrub@.service")?;
+    let mut scrub_timer_path = openopt_write("/mnt/etc/systemd/system/zfs-scrub@.timer")?;
+    let mut scrub_service_path = openopt_write("/mnt/etc/systemd/system/zfs-scrub@.service")?;
     let scrub_timer = r"
 [Unit]
 Description=Monthly zpool scrub on %i
@@ -593,7 +580,41 @@ WantedBy=multi-user.target
     writeln!(scrub_timer_path, "{}", scrub_timer)?;
     writeln!(scrub_service_path, "{}", scrub_service)?;
 
-    eprintln!("\nEnable networkmanager service unit...\n");
+    if sail.is_using_ssd() {
+        eprintln!("\nGenerate monthly trim service...\n");
+        let mut trim_timer_path = openopt_write("/mnt/etc/systemd/system/zfs-trim@.timer")?;
+        let mut trim_service_path = openopt_write("/mnt/etc/systemd/system/zfs-trim@.service")?;
+        let trim_timer = r"
+[Unit]
+Description=Monthly zpool trim on %i
+
+[Timer]
+OnCalendar=monthly
+AccuracySec=1h
+Persistent=true
+
+[Install]
+WantedBy=multi-user.target
+";
+        let trim_service = r"
+[Unit]
+Description=zpool trim on %i
+
+[Service]
+Nice=19
+IOSchedulingClass=idle
+KillSignal=SIGINT
+ExecStart=/usr/bin/zpool trim %i
+
+[Install]
+WantedBy=multi-user.target
+";
+
+        writeln!(trim_timer_path, "{}", trim_timer)?;
+        writeln!(trim_service_path, "{}", trim_service)?;
+    }
+
+    eprintln!("\nEnable systemd services...\n");
     let arch_chroot = Split("arch-chroot /mnt bash --login");
     let nm_enable = r"
 systemctl enable NetworkManager
@@ -616,11 +637,7 @@ systemctl enable zfs-scrub@bpool.timer
     eprintln!("\nGenerating script post installation...\n");
     run_result!(%"mkdir -p", post_scripts_path)?;
 
-    let mut data_pools_path = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open([post_scripts_path, "/addt_data_pools.sh"].concat())?;
+    let mut data_pools_path = openopt_write([post_scripts_path, "/addt_data_pools.sh"].concat())?;
     let data_pools = r#"
 DATA_POOL='tank0 tank1'
 
@@ -636,11 +653,7 @@ done
 "#;
     writeln!(data_pools_path, "{}", data_pools)?;
 
-    let mut add_user_path = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open([post_scripts_path, "/add_user.sh"].concat())?;
+    let mut add_user_path = openopt_write([post_scripts_path, "/add_user.sh"].concat())?;
     let add_user = r"
 myUser=UserName
 useradd -m -G wheel -s /bin/zsh ${myUser}
@@ -670,6 +683,7 @@ fn main() -> Result<()> {
     let sail = Sail::new(
         LinuxVariant::LinuxLts,
         ZfsType::Normal,
+        StorageType::Ssd,
         "/dev/disk/by-path/virtio-pci-0000:04:00.0",
         "1G",
         "4G",
@@ -684,7 +698,7 @@ fn main() -> Result<()> {
     install_aurs()?;
     workarounds()?;
     bootloaders(&sail)?;
-    finishing()?;
+    finishing(&sail)?;
 
     // TODO: check if using hdd or ssd
     // TODO: schedule scrub and trim using timer or cron

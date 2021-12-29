@@ -14,6 +14,11 @@ pub enum ZfsType {
     Dkms,
 }
 
+pub enum StorageType {
+    Ssd,
+    Hdd,
+}
+
 pub struct Sail {
     inst_linvar: String,
     inst_zfs: String,
@@ -21,12 +26,14 @@ pub struct Sail {
     inst_partsize_esp: String,
     inst_partsize_bpool: String,
     next_partnum: usize,
+    storage_type: StorageType,
 }
 
 impl Sail {
     pub fn new(
         linvar: LinuxVariant,
         zfs_type: ZfsType,
+        storage_type: StorageType,
         disk: &str,
         partsize_esp: &str,
         partsize_bpool: &str,
@@ -51,6 +58,7 @@ impl Sail {
             inst_partsize_esp: partsize_esp.to_owned(),
             inst_partsize_bpool: partsize_bpool.to_owned(),
             next_partnum: Self::_get_next_partnum(disk)?,
+            storage_type,
         })
     }
 
@@ -158,5 +166,12 @@ impl Sail {
         }
 
         Ok(last_partnum)
+    }
+
+    pub fn is_using_ssd(&self) -> bool {
+        match self.storage_type {
+            StorageType::Ssd => true,
+            StorageType::Hdd => false,
+        }
     }
 }
