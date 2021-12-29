@@ -5,7 +5,7 @@ use anyhow::{bail, Context, Result};
 use cradle::input::{Split, Stdin};
 use cradle::output::StdoutTrimmed;
 use cradle::prelude::*;
-use sail::{LinuxVariant, ZfsType, StorageType};
+use sail::{LinuxVariant, StorageType, ZfsType};
 use std::fs::File;
 use std::io::Write;
 use std::path::Path;
@@ -58,6 +58,18 @@ fn check_as_root() -> Result<()> {
     Ok(())
 }
 
+fn openopt_append<P>(path: P) -> Result<File>
+where
+    P: AsRef<Path>,
+{
+    let openopt = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path)?;
+
+    Ok(openopt)
+}
+
 fn openopt_write<P>(path: P) -> Result<File>
 where
     P: AsRef<Path>,
@@ -67,7 +79,7 @@ where
         .create(true)
         .truncate(true)
         .open(path)?;
-    
+
     Ok(openopt)
 }
 
@@ -274,9 +286,7 @@ fn system_configuration(sail: &Sail) -> Result<()> {
         "GRUB_DISABLE_OS_PROBER=false\n",
         sail.get_disk_parent()?
     );
-    let mut grub_default = OpenOptions::new()
-        .append(true)
-        .open("/mnt/etc/default/grub")?;
+    let mut grub_default = openopt_append("/mnt/etc/default/grub")?;
 
     writeln!(grub_default, "{}", cmdline)?;
 
@@ -301,10 +311,7 @@ fn system_configuration(sail: &Sail) -> Result<()> {
     eprintln!("\nConfigure mkinitcpio...\n");
     run_result!(%"mv /mnt/etc/mkinitcpio.conf /mnt/etc/mkinitcpio.conf.old")?;
 
-    let mut mkinitcpio = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open("/mnt/etc/mkinitcpio.conf")?;
+    let mut mkinitcpio = openopt_append("/mnt/etc/mkinitcpio.conf")?;
     let hooks = "HOOKS=(base udev autodetect modconf block keyboard zfs filesystems)";
 
     writeln!(mkinitcpio, "{}", hooks)?;
@@ -337,10 +344,7 @@ fn system_configuration(sail: &Sail) -> Result<()> {
 INST_LINVAR=$(sed 's|.*linux|linux|' /proc/cmdline | sed 's|.img||g' | awk '{ print $1 }')
 pacman -Sy --needed --noconfirm ${INST_LINVAR} ${INST_LINVAR}-headers zfs-${INST_LINVAR} zfs-utils
 ";
-    let mut script_file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .open("/mnt/usr/local/bin/kernel_updater")?;
+    let mut script_file = openopt_write("/mnt/usr/local/bin/kernel_updater")?;
     writeln!(script_file, "{}", script)?;
     run_result!(%"chmod +x /mnt/usr/local/bin/kernel_updater")?;
 
@@ -369,10 +373,7 @@ pacman -Sy --needed --noconfirm ${INST_LINVAR} ${INST_LINVAR}-headers zfs-${INST
     writeln!(mirrorlist_archzfs, "{}", mirrorlist)?;
 
     eprintln!("\nAdd archzfs repo...\n");
-    let mut pacman_conf = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open("/mnt/etc/pacman.conf")?;
+    let mut pacman_conf = openopt_append("/mnt/etc/pacman.conf")?;
     let archzfs_repo = r"
 #[archzfs-testing]
 #Include = /etc/pacman.d/mirrorlist-archzfs
@@ -477,10 +478,7 @@ fn workarounds() -> Result<()> {
     let canonical_fix = "export ZPOOL_VDEV_NAME_PATH=YES";
     let mut zpool_vdev = openopt_write("/mnt/etc/profile.d/zpool_vdev_name_path.sh")?;
     let env_keep = r#"Defaults env_keep += "ZPOOL_VDEV_NAME_PATH""#;
-    let mut sudoers = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open("/mnt/etc/sudoers")?;
+    let mut sudoers = openopt_append("/mnt/etc/sudoers")?;
 
     writeln!(zpool_vdev, "{}", canonical_fix)?;
     writeln!(sudoers, "{}", env_keep)?;
@@ -623,13 +621,17 @@ systemctl enable zfs-scrub@rpool.timer
 systemctl enable zfs-scrub@bpool.timer
 ";
     run_result!(&arch_chroot, Stdin(nm_enable))?;
+    if sail.is_using_ssd() {
+        let trim_enable = r"
+systemctl enable zfs-trim@rpool.timer
+systemctl enable zfs-trim@bpool.timer
+";
+        run_result!(&arch_chroot, Stdin(trim_enable))?;
+    }
 
     eprintln!("\nAdd wheel to sudoers...\n");
     let wheel_sudo = "%wheel ALL=(ALL) ALL";
-    let mut sudoers = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open("/mnt/etc/sudoers")?;
+    let mut sudoers = openopt_append("/mnt/etc/sudoers")?;
 
     writeln!(sudoers, "{}", wheel_sudo)?;
 
