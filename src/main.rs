@@ -201,6 +201,7 @@ fn format_disk(sail: &Sail) -> Result<()> {
 
     eprintln!("\nOptional user data datasets...\n");
     run_result!(%"zfs create -o canmount=on rpool/arch/DATA/default/var/games")?;
+    run_result!(%"chmod 775 /mnt/var/games")?;
     run_result!(%"zfs create -o canmount=on rpool/arch/DATA/default/var/www")?;
     eprintln!("\nFor GNOME...\n");
     run_result!(%"zfs create -o canmount=on rpool/arch/DATA/default/var/lib/AccountsService")?;
@@ -635,7 +636,7 @@ systemctl enable zfs-trim@bpool.timer
     writeln!(sudoers, "{}", wheel_sudo)?;
 
     let post_scripts_path = "/mnt/root/post_install_scripts";
-    eprintln!("\nGenerating script post installation...\n");
+    eprintln!("\nGenerating post-installation scripts...\n");
     run_result!(%"mkdir -p", post_scripts_path)?;
 
     let mut data_pools_path = openopt_write([post_scripts_path, "/addt_data_pools.sh"].concat())?;
@@ -670,6 +671,10 @@ systemctl enable zrepl
 
     thread::sleep(duration);
 
+    Ok(())
+}
+
+fn shot_and_clean() -> Result<()> {
     eprintln!("\nSnapshot of clean installation...\n");
     run_result!(%"zfs snapshot -r rpool/arch@install")?;
     run_result!(%"zfs snapshot -r bpool/arch@install")?;
@@ -680,7 +685,6 @@ systemctl enable zrepl
 
     eprintln!("\nExport pools...\n");
     run_result!(%"zpool export bpool")?;
-    thread::sleep(duration);
     run_result!(%"zpool export rpool")?;
 
     Ok(())
@@ -690,10 +694,10 @@ fn main() -> Result<()> {
     let sail = Sail::new(
         LinuxVariant::LinuxLts,
         ZfsType::Normal,
-        StorageType::Ssd,
+        StorageType::Hdd,
         "/dev/disk/by-path/virtio-pci-0000:04:00.0",
-        "1G",
-        "4G",
+        "500M",
+        "3G",
     )?;
 
     command_checker()?;
@@ -706,6 +710,7 @@ fn main() -> Result<()> {
     workarounds()?;
     bootloaders(&sail)?;
     finishing(&sail)?;
+    shot_and_clean()?;
 
     Ok(())
 }
