@@ -615,12 +615,12 @@ WantedBy=multi-user.target
 
     eprintln!("\nEnable systemd services...\n");
     let arch_chroot = Split("arch-chroot /mnt bash --login");
-    let nm_enable = r"
+    let service_enable = r"
 systemctl enable NetworkManager
 systemctl enable zfs-scrub@rpool.timer
 systemctl enable zfs-scrub@bpool.timer
 ";
-    run_result!(&arch_chroot, Stdin(nm_enable))?;
+    run_result!(&arch_chroot, Stdin(service_enable))?;
     if sail.is_using_ssd() {
         let trim_enable = r"
 systemctl enable zfs-trim@rpool.timer
@@ -639,8 +639,72 @@ systemctl enable zfs-trim@bpool.timer
     eprintln!("\nGenerating post-installation scripts...\n");
     run_result!(%"mkdir -p", post_scripts_path)?;
 
-    let mut data_pools_path = openopt_write([post_scripts_path, "/addt_data_pools.sh"].concat())?;
-    let data_pools = r#"
+    let mut additional_storage_p = openopt_write([post_scripts_path, "/additional_storage.sh"].concat())?;
+    let additional_storage = r#"
+set -e
+
+my_user=UserName
+pool_name=tank0
+disk=/dev/disk/by-path/virtio-pci-0000:04:00.0-part1
+tmp_mpoint=/mnt/tmpmnt
+dsets_mpoint_pair=(
+    "Documents /home/UserName/Documents"
+    "Downloads /home/UserName/Downloads"
+    "Videos /home/UserName/Videos"
+)
+
+mkdir -p "$tmp_mpoint"
+
+zpool create \
+    -o ashift=12 \
+    -o autotrim=on \
+    -R "$tmp_mpoint" \
+    -O acltype=posixacl \
+    -O canmount=off \
+    -O compression=zstd \
+    -O dnodesize=auto \
+    -O normalization=formD \
+    -O relatime=on \
+    -O xattr=sa \
+    -O mountpoint=/ \
+    ${pool_name} \
+    ${disk}
+
+zfs create -o canmount=off -o mountpoint=none ${pool_name}/arch
+zfs create -o canmount=off -o mountpoint=none ${pool_name}/arch/DATA
+zfs create -o canmount=off -o mountpoint=none ${pool_name}/arch/DATA/default
+
+for pair in "${dsets_mpoint_pair[@]}"; do
+    read -r dset mpoint <<< "$pair"
+
+    zfs create -o mountpoint="$mpoint" -o canmount=on ${pool_name}/arch/DATA/default/"$dset"
+
+    chown -R ${my_user}:${my_user} "$tmp_mpoint"/"$mpoint"
+
+    echo "${pool_name}/arch/DATA/default/$dset  $mpoint zfs x-systemd.automount,noauto,zfsutil,rw,xattr,posixacl   0 0" >> /etc/fstab
+done
+
+zpool export "$pool_name"
+rm -rf "$tmp_mpoint"
+"#;
+    writeln!(additional_storage_p, "{}", additional_storage)?;
+
+    let mut add_user_p = openopt_write([post_scripts_path, "/add_user.sh"].concat())?;
+    let add_user = r"
+myUser=UserName
+useradd -m -G wheel -s /bin/zsh ${myUser}
+passwd ${myUser}
+";
+    writeln!(add_user_p, "{}", add_user)?;
+
+    let mut enable_services_p = openopt_write([post_scripts_path, "/enable_services.sh"].concat())?;
+    let enable_services = r"
+systemctl enable zrepl
+";
+    writeln!(enable_services_p, "{}", enable_services)?;
+
+    let mut zfs_mount_generator_p = openopt_write([post_scripts_path, "/zfs_mount_generator.sh"].concat())?;
+    let zfs_mount_generator = r#"
 DATA_POOL='tank0 tank1'
 
 # tab-separated zfs properties
@@ -649,28 +713,15 @@ export \
 PROPS="name,mountpoint,canmount,atime,relatime,devices,exec\
 ,readonly,setuid,nbmand,encroot,keylocation"
 
+mkdir -p /etc/zfs/zfs-list.cache
+
 for i in $DATA_POOL; do
   zfs list -H -t filesystem -o $PROPS -r $i > /etc/zfs/zfs-list.cache/$i
 done
 "#;
-    writeln!(data_pools_path, "{}", data_pools)?;
-
-    let mut add_user_path = openopt_write([post_scripts_path, "/add_user.sh"].concat())?;
-    let add_user = r"
-myUser=UserName
-useradd -m -G wheel -s /bin/zsh ${myUser}
-passwd ${myUser}
-";
-    writeln!(add_user_path, "{}", add_user)?;
-
-    let mut enable_services_path = openopt_write([post_scripts_path, "/enable_services.sh"].concat())?;
-    let enable_services = r"
-systemctl enable zrepl
-";
-    writeln!(enable_services_path, "{}", enable_services)?;
-
+    writeln!(zfs_mount_generator_p, "{}", zfs_mount_generator)?;
+    
     thread::sleep(duration);
-
     Ok(())
 }
 
