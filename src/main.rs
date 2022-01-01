@@ -25,6 +25,7 @@ fn main() -> Result<()> {
     setup::install_aurs()?;
     setup::workarounds()?;
     setup::bootloaders(&sail)?;
+    setup::post_scripts_gen()?;
     setup::finishing(&sail)?;
     setup::shot_and_clean()?;
 

@@ -440,9 +440,28 @@ pub fn bootloaders(sail: &Sail) -> Result<()> {
     Ok(())
 }
 
-pub fn finishing(sail: &Sail) -> Result<()> {
-    let some_delay = time::Duration::from_secs(1);
+pub fn post_scripts_gen() -> Result<()> {
+    eprintln!("\nGenerating post-installation scripts...\n");
+    let post_scripts_p = "/mnt/root/post_install_scripts";
+    run_result!(%"mkdir -p", post_scripts_p)?;
 
+    let path_script_pairs = [
+        ("additional_storage.sh", string_res::ADDITIONAL_STORAGE_S),
+        ("add_user.sh", string_res::ADD_USER_S),
+        ("enable_services.sh", string_res::ENABLE_SERVICES_S),
+        ("zfs_mount_generator.sh", string_res::ZFS_MOUNT_GENERATOR_S),
+    ];
+
+    for pair in path_script_pairs {
+        let mut script_p = openopt_w([post_scripts_p, "/", pair.0].concat())?;
+        let script_s = pair.1;
+        writeln!(script_p, "{}", script_s)?;
+    }
+
+    Ok(())
+}
+
+pub fn finishing(sail: &Sail) -> Result<()> {
     eprintln!("\nGenerate monthly scrub service...\n");
     let mut scrub_timer_p = openopt_w("/mnt/etc/systemd/system/zfs-scrub@.timer")?;
     let mut scrub_service_p = openopt_w("/mnt/etc/systemd/system/zfs-scrub@.service")?;
@@ -475,28 +494,6 @@ pub fn finishing(sail: &Sail) -> Result<()> {
     let mut sudoers_p = openopt_a("/mnt/etc/sudoers")?;
     writeln!(sudoers_p, "{}", wheel_sudoers_c)?;
 
-    let post_scripts_p = "/mnt/root/post_install_scripts";
-    eprintln!("\nGenerating post-installation scripts...\n");
-    run_result!(%"mkdir -p", post_scripts_p)?;
-
-    let mut additional_storage_p = openopt_w([post_scripts_p, "/additional_storage.sh"].concat())?;
-    let additional_storage_s = string_res::ADDITIONAL_STORAGE_S;
-    writeln!(additional_storage_p, "{}", additional_storage_s)?;
-
-    let mut add_user_p = openopt_w([post_scripts_p, "/add_user.sh"].concat())?;
-    let add_user_s = string_res::ADD_USER_S;
-    writeln!(add_user_p, "{}", add_user_s)?;
-
-    let mut enable_services_p = openopt_w([post_scripts_p, "/enable_services.sh"].concat())?;
-    let enable_services_s = string_res::ENABLE_SERVICES_S;
-    writeln!(enable_services_p, "{}", enable_services_s)?;
-
-    let mut zfs_mount_generator_p =
-        openopt_w([post_scripts_p, "/zfs_mount_generator.sh"].concat())?;
-    let zfs_mount_generator_s = string_res::ZFS_MOUNT_GENERATOR_S;
-    writeln!(zfs_mount_generator_p, "{}", zfs_mount_generator_s)?;
-
-    thread::sleep(some_delay);
     Ok(())
 }
 
