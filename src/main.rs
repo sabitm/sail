@@ -10,10 +10,10 @@ fn main() -> Result<()> {
     let sail = Sail::new(
         LinuxVariant::LinuxLts,
         ZfsType::Normal,
-        StorageType::Hdd,
+        StorageType::Ssd,
         "/dev/disk/by-path/virtio-pci-0000:04:00.0",
         "500M",
-        "3G",
+        "3.5G",
     )?;
 
     setup::command_checker()?;
@@ -28,8 +28,6 @@ fn main() -> Result<()> {
     setup::finishing(&sail)?;
     setup::shot_and_clean()?;
 
-    // TODO: split string to separate module
-    // TODO: convert _path to _p
     // TODO: wrapper fn for eprintln!
     // TODO: nix install script
 
