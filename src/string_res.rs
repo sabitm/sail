@@ -220,9 +220,9 @@ rm -rf "$tmp_mpoint"
 "#;
 
 pub const ADD_USER_S: &str = r"
-myUser=UserName
-useradd -m -G wheel -s /bin/zsh ${myUser}
-passwd ${myUser}
+my_user=UserName
+useradd -m -G wheel -s /bin/zsh ${my_user}
+passwd ${my_user}
 ";
 
 pub const ENABLE_SERVICES_S: &str = r"
@@ -243,4 +243,20 @@ mkdir -p /etc/zfs/zfs-list.cache
 for i in $DATA_POOL; do
   zfs list -H -t filesystem -o $PROPS -r $i > /etc/zfs/zfs-list.cache/$i
 done
+"#;
+
+pub const NIX_INSTALL_S: &str = r#"
+set -e
+my_user=UserName
+
+pacman -S nix
+systemctl enable nix-daemon.service
+gpasswd -a "${my_user}" nix-users
+
+cat <<EOF > /home/"${my_user}"/nix_channel_setup.sh
+nix-channel --add https://nixos.org/channels/nixpkgs-unstable
+nix-channel --update
+EOF
+
+echo "Reboot as ${my_user} and execute /home/${my_user}/nix_channel_setup.sh"
 "#;

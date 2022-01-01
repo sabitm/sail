@@ -29,8 +29,5 @@ fn main() -> Result<()> {
     setup::post_scripts_gen()?;
     setup::shot_and_clean()?;
 
-    // TODO: wrapper fn for eprintln!
-    // TODO: nix install script
-
     Ok(())
 }
