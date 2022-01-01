@@ -64,26 +64,26 @@ pub const ZREPL_YML_C: &str = r#"
 jobs:
 
 - name: snapjob
-type: snap
-filesystems: {
-"bpool/arch/BOOT": true,
-"bpool/arch/BOOT/default": true,
-"rpool/arch/DATA<": true,
-"rpool/arch/ROOT": true,
-"rpool/arch/ROOT/default": true,
-}
-snapshotting:
-type: periodic
-interval: 15m
-prefix: zrepl_
-pruning:
-keep:
-- type: grid
-  grid: 1x1h(keep=all) | 12x1h | 7x1d
-  regex: "^zrepl_.*"
-- type: regex
-  negate: true
-  regex: "^zrepl_.*"
+  type: snap
+  filesystems: {
+    "bpool/arch/BOOT": true,
+    "bpool/arch/BOOT/default": true,
+    "rpool/arch/DATA<": true,
+    "rpool/arch/ROOT": true,
+    "rpool/arch/ROOT/default": true,
+  }
+  snapshotting:
+    type: periodic
+    interval: 15m
+    prefix: zrepl_
+  pruning:
+    keep:
+    - type: grid
+      grid: 1x1h(keep=all) | 12x1h | 7x1d
+      regex: "^zrepl_.*"
+    - type: regex
+      negate: true
+      regex: "^zrepl_.*"
 "#;
 
 pub const GEN_INITRD_I: &str = r"
