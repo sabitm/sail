@@ -25,8 +25,8 @@ fn main() -> Result<()> {
     setup::install_aurs()?;
     setup::workarounds()?;
     setup::bootloaders(&sail)?;
-    setup::post_scripts_gen()?;
     setup::finishing(&sail)?;
+    setup::post_scripts_gen()?;
     setup::shot_and_clean()?;
 
     // TODO: wrapper fn for eprintln!
