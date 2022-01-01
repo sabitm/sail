@@ -6,11 +6,31 @@ use cradle::{
     run_output, run_result,
 };
 use std::{
-    fs::{File, OpenOptions},
+    fs::OpenOptions,
     io::Write,
-    path::Path,
     thread, time,
 };
+
+fn writeln_w(content: &str, path: &str) -> Result<()> {
+    let mut path = OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .open(path)?;
+    writeln!(path, "{}", content)?;
+
+    Ok(())
+}
+
+fn writeln_a(content: &str, path: &str) -> Result<()> {
+    let mut path = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(path)?;
+    writeln!(path, "{}", content)?;
+
+    Ok(())
+}
 
 pub fn command_checker() -> Result<()> {
     let commands = [
@@ -57,26 +77,6 @@ pub fn check_as_root() -> Result<()> {
     }
 
     Ok(())
-}
-
-fn openopt_a<P>(path: P) -> Result<File>
-where
-    P: AsRef<Path>,
-{
-    let openopt = OpenOptions::new().append(true).create(true).open(path)?;
-    Ok(openopt)
-}
-
-fn openopt_w<P>(path: P) -> Result<File>
-where
-    P: AsRef<Path>,
-{
-    let openopt = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(path)?;
-    Ok(openopt)
 }
 
 pub fn partition_disk(sail: &Sail) -> Result<()> {
@@ -274,33 +274,31 @@ pub fn pacstrap(sail: &Sail) -> Result<()> {
 
 pub fn system_configuration(sail: &Sail) -> Result<()> {
     eprintln!("\nSet mkinitcpio zfs hook scan path...\n");
-    let mut grub_default_p = openopt_a("/mnt/etc/default/grub")?;
     let grub_cmdline_c = format!(
         r#"{}GRUB_CMDLINE_LINUX="zfs_import_dir={}""#,
         "GRUB_DISABLE_OS_PROBER=false\n",
         sail.get_disk_parent()?
     );
-    writeln!(grub_default_p, "{}", grub_cmdline_c)?;
+    writeln_a(&grub_cmdline_c, "/mnt/etc/default/grub")?;
 
     eprintln!("\nGenerate fstab...\n");
-    let mut fstab_p = openopt_w("/mnt/etc/fstab")?;
     let StdoutTrimmed(out) = run_result!(%"genfstab -U /mnt")?;
     let StdoutTrimmed(out) = run_result!(%"sed", "s;zfs[[:space:]]*;zfs zfsutil,;g", Stdin(out))?;
     let StdoutTrimmed(fstab_zfs) = run_result!(%"grep", "zfs zfsutil", Stdin(out))?;
-    writeln!(fstab_p, "{}", fstab_zfs)?;
+    writeln_w(&fstab_zfs, "/mnt/etc/fstab")?;
 
     let efi_part = sail.get_efi_part()?;
     let StdoutTrimmed(uuid) = run_result!(%"blkid -s UUID -o value", efi_part)?;
     let fstab_efis = format!("/boot/efis/{}", sail.get_efi_last_path()?);
     let fstab_efis = format!("UUID={} {} {}", uuid, fstab_efis, "vfat x-systemd.idle-timeout=1min,x-systemd.automount,noauto,umask=0022,fmask=0022,dmask=0022 0 1");
     let fstab_efi = format!("UUID={} {}", uuid, "/boot/efi vfat x-systemd.idle-timeout=1min,x-systemd.automount,noauto,umask=0022,fmask=0022,dmask=0022 0 1");
-    writeln!(fstab_p, "{}\n{}", fstab_efis, fstab_efi)?;
+    let fstab_efi = format!("{}\n{}", fstab_efis, fstab_efi);
+    writeln_a(&fstab_efi, "/mnt/etc/fstab")?;
 
     eprintln!("\nConfigure mkinitcpio...\n");
-    let mut mkinitcpio_p = openopt_a("/mnt/etc/mkinitcpio.conf")?;
-    let hooks_c = "HOOKS=(base udev autodetect modconf block keyboard zfs filesystems)";
     run_result!(%"mv /mnt/etc/mkinitcpio.conf /mnt/etc/mkinitcpio.conf.old")?;
-    writeln!(mkinitcpio_p, "{}", hooks_c)?;
+    let hooks_c = "HOOKS=(base udev autodetect modconf block keyboard zfs filesystems)";
+    writeln_a(hooks_c, "/mnt/etc/mkinitcpio.conf")?;
 
     eprintln!("\nEnable internet time sync...\n");
     run_result!(%"hwclock --systohc")?;
@@ -325,9 +323,7 @@ pub fn system_configuration(sail: &Sail) -> Result<()> {
     run_result!(%"sed -i", exp, "/mnt/etc/pacman.conf")?;
 
     eprintln!("\nGenerate kernel_updater script in /usr/local/bin...\n");
-    let mut kernel_updater_p = openopt_w("/mnt/usr/local/bin/kernel_updater")?;
-    let kernel_updater_s = string_res::KERNEL_UPDATER_S;
-    writeln!(kernel_updater_p, "{}", kernel_updater_s)?;
+    writeln_w(string_res::KERNEL_UPDATER_S, "/mnt/usr/local/bin/kernel_updater")?;
     run_result!(%"chmod +x /mnt/usr/local/bin/kernel_updater")?;
 
     eprintln!("\nEnable zfs services...\n");
@@ -335,9 +331,7 @@ pub fn system_configuration(sail: &Sail) -> Result<()> {
     run_result!(%"systemctl disable zfs-mount --root=/mnt")?;
 
     eprintln!("\nApply locales...\n");
-    let locales_c = "en_US.UTF-8 UTF-8";
-    let mut locale_file_p = openopt_w("/mnt/etc/locale.gen")?;
-    writeln!(locale_file_p, "{}", locales_c)?;
+    writeln_w("en_US.UTF-8 UTF-8", "/mnt/etc/locale.gen")?;
     run_result!(%"arch-chroot /mnt bash --login", Stdin("locale-gen"))?;
 
     eprintln!("\nImport keys of archzfs...\n");
@@ -348,14 +342,11 @@ pub fn system_configuration(sail: &Sail) -> Result<()> {
     let StdoutTrimmed(sign_key) = run_result!(%"curl -L https://git.io/JsfVS")?;
     run_result!(%"arch-chroot /mnt pacman-key --lsign-key", sign_key)?;
 
-    let StdoutTrimmed(mirrorlist_c) = run_result!(%"curl -L https://git.io/Jsfw2")?;
-    let mut mirrorlist_archzfs_p = openopt_w("/mnt/etc/pacman.d/mirrorlist-archzfs")?;
-    writeln!(mirrorlist_archzfs_p, "{}", mirrorlist_c)?;
+    let StdoutTrimmed(archzfs_mirrorlist_c) = run_result!(%"curl -L https://git.io/Jsfw2")?;
+    writeln_w(&archzfs_mirrorlist_c, "/mnt/etc/pacman.d/mirrorlist-archzfs")?;
 
     eprintln!("\nAdd archzfs repo...\n");
-    let mut pacman_conf_p = openopt_a("/mnt/etc/pacman.conf")?;
-    let archzfs_repo_c = string_res::ARCHZFS_REPO_C;
-    writeln!(pacman_conf_p, "{}", archzfs_repo_c)?;
+    writeln_a(string_res::ARCHZFS_REPO_C, "/mnt/etc/pacman.conf")?;
 
     Ok(())
 }
@@ -381,9 +372,7 @@ pub fn install_aurs() -> Result<()> {
 
     eprintln!("\nGenerate zrepl configuration...\n");
     run_result!(%"mkdir -p /mnt/etc/zrepl")?;
-    let mut zrepl_conf_path_p = openopt_w("/mnt/etc/zrepl/zrepl.yml")?;
-    let zrepl_yml_c = string_res::ZREPL_YML_C;
-    writeln!(zrepl_conf_path_p, "{}", zrepl_yml_c)?;
+    writeln_w(string_res::ZREPL_YML_C, "/mnt/etc/zrepl/zrepl.yml")?;
 
     eprintln!("\nDelete temporary user...\n");
     run_result!(%"rm /mnt/etc/sudoers.d/00_nobody")?;
@@ -393,12 +382,10 @@ pub fn install_aurs() -> Result<()> {
 
 pub fn workarounds() -> Result<()> {
     eprintln!("\nGrub canonical path fix...\n");
-    let mut zpool_vdev_p = openopt_w("/mnt/etc/profile.d/zpool_vdev_name_path.sh")?;
-    let mut sudoers_p = openopt_a("/mnt/etc/sudoers")?;
     let canonical_fix_c = "export ZPOOL_VDEV_NAME_PATH=YES";
     let env_keep_c = r#"Defaults env_keep += "ZPOOL_VDEV_NAME_PATH""#;
-    writeln!(zpool_vdev_p, "{}", canonical_fix_c)?;
-    writeln!(sudoers_p, "{}", env_keep_c)?;
+    writeln_w(canonical_fix_c, "/mnt/etc/profile.d/zpool_vdev_name_path.sh")?;
+    writeln_a(env_keep_c, "/mnt/etc/sudoers")?;
 
     eprintln!("\nPool name missing fix...\n");
     let exp =
@@ -453,9 +440,8 @@ pub fn post_scripts_gen() -> Result<()> {
     ];
 
     for pair in path_script_pairs {
-        let mut script_p = openopt_w([post_scripts_p, "/", pair.0].concat())?;
-        let script_s = pair.1;
-        writeln!(script_p, "{}", script_s)?;
+        let path = [post_scripts_p, "/", pair.0].concat();
+        writeln_w(pair.1, &path)?;
     }
 
     Ok(())
@@ -463,21 +449,13 @@ pub fn post_scripts_gen() -> Result<()> {
 
 pub fn finishing(sail: &Sail) -> Result<()> {
     eprintln!("\nGenerate monthly scrub service...\n");
-    let mut scrub_timer_p = openopt_w("/mnt/etc/systemd/system/zfs-scrub@.timer")?;
-    let mut scrub_service_p = openopt_w("/mnt/etc/systemd/system/zfs-scrub@.service")?;
-    let scrub_timer_c = string_res::SCRUB_TIMER_C;
-    let scrub_service_c = string_res::SCRUB_SERVICE_C;
-    writeln!(scrub_timer_p, "{}", scrub_timer_c)?;
-    writeln!(scrub_service_p, "{}", scrub_service_c)?;
+    writeln_w(string_res::SCRUB_TIMER_C, "/mnt/etc/systemd/system/zfs-scrub@.timer")?;
+    writeln_w(string_res::SCRUB_SERVICE_C, "/mnt/etc/systemd/system/zfs-scrub@.service")?;
 
     if sail.is_using_ssd() {
         eprintln!("\nGenerate monthly trim service...\n");
-        let mut trim_timer_p = openopt_w("/mnt/etc/systemd/system/zfs-trim@.timer")?;
-        let mut trim_service_p = openopt_w("/mnt/etc/systemd/system/zfs-trim@.service")?;
-        let trim_timer_c = string_res::TRIM_TIMER_C;
-        let trim_service_c = string_res::TRIM_SERVICE_C;
-        writeln!(trim_timer_p, "{}", trim_timer_c)?;
-        writeln!(trim_service_p, "{}", trim_service_c)?;
+        writeln_w(string_res::TRIM_TIMER_C, "/mnt/etc/systemd/system/zfs-trim@.timer")?;
+        writeln_w(string_res::TRIM_SERVICE_C, "/mnt/etc/systemd/system/zfs-trim@.service")?;
     }
 
     eprintln!("\nEnable systemd services...\n");
@@ -490,9 +468,7 @@ pub fn finishing(sail: &Sail) -> Result<()> {
     }
 
     eprintln!("\nAdd wheel to sudoers...\n");
-    let wheel_sudoers_c = "%wheel ALL=(ALL) ALL";
-    let mut sudoers_p = openopt_a("/mnt/etc/sudoers")?;
-    writeln!(sudoers_p, "{}", wheel_sudoers_c)?;
+    writeln_a("%wheel ALL=(ALL) ALL", "/mnt/etc/sudoers")?;
 
     Ok(())
 }
