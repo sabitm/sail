@@ -185,9 +185,8 @@ pool_name=tank0
 disk=/dev/disk/by-path/virtio-pci-0000:04:00.0-part1
 tmp_mpoint=/mnt/tmpmnt
 dsets_mpoint_pair=(
-    "Documents /home/UserName/Documents"
-    "Downloads /home/UserName/Downloads"
-    "Videos /home/UserName/Videos"
+    "Downloads /home/${my_user}/Downloads"
+    "dot_cache /home/${my_user}/.cache"
 )
 
 mkdir -p "$tmp_mpoint"
@@ -264,5 +263,5 @@ nix-channel --add https://nixos.org/channels/nixpkgs-unstable
 nix-channel --update
 EOF
 
-echo "Reboot as ${my_user} and execute /home/${my_user}/nix_channel_setup.sh"
+echo "\nReboot as ${my_user} and execute /home/${my_user}/nix_channel_setup.sh"
 "#;
