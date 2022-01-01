@@ -209,6 +209,8 @@ pub fn format_disk(sail: &Sail) -> Result<()> {
     run_result!(%"zfs create -o canmount=on rpool/arch/DATA/default/var/lib/lxc")?;
     log("For LibVirt");
     run_result!(%"zfs create -o canmount=on rpool/arch/DATA/default/var/lib/libvirt")?;
+    log("For nix");
+    run_result!(%"zfs create -o canmount=on rpool/arch/DATA/default/nix")?;
 
     Ok(())
 }
