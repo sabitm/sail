@@ -12,8 +12,8 @@ fn main() -> Result<()> {
         ZfsType::Normal,
         StorageType::Ssd,
         "/dev/disk/by-path/virtio-pci-0000:04:00.0",
-        "500M",
-        "3.5G",
+        "1G",
+        "4G",
     )?;
 
     setup::command_checker()?;

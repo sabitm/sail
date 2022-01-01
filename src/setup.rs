@@ -277,6 +277,8 @@ pub fn pacstrap(sail: &Sail) -> Result<()> {
 }
 
 pub fn system_configuration(sail: &Sail) -> Result<()> {
+    let arch_chroot = Split("arch-chroot /mnt bash --login");
+
     log("Set mkinitcpio zfs hook scan path");
     let grub_cmdline_c = format!(
         r#"{}GRUB_CMDLINE_LINUX="zfs_import_dir={}""#,
@@ -336,18 +338,11 @@ pub fn system_configuration(sail: &Sail) -> Result<()> {
 
     log("Apply locales");
     writeln_w("en_US.UTF-8 UTF-8", "/mnt/etc/locale.gen")?;
-    run_result!(%"arch-chroot /mnt bash --login", Stdin("locale-gen"))?;
+    run_result!(&arch_chroot, Stdin("locale-gen"))?;
 
     log("Import keys of archzfs");
-    let StdoutTrimmed(archzfs_gpg) =
-        run_result!(%"curl -L https://mirror.sum7.eu/archlinux/archzfs/archzfs.gpg")?;
-    run_result!(%"arch-chroot /mnt pacman-key -a -", Stdin(archzfs_gpg))?;
-
-    let StdoutTrimmed(sign_key) = run_result!(%"curl -L https://git.io/JsfVS")?;
-    run_result!(%"arch-chroot /mnt pacman-key --lsign-key", sign_key)?;
-
-    let StdoutTrimmed(archzfs_mirrorlist_c) = run_result!(%"curl -L https://git.io/Jsfw2")?;
-    writeln_w(&archzfs_mirrorlist_c, "/mnt/etc/pacman.d/mirrorlist-archzfs")?;
+    let import_archzfs_keys_i = string_res::IMPORT_ARCHZFS_KEYS_I;
+    run_result!(&arch_chroot, Stdin(import_archzfs_keys_i))?;
 
     log("Add archzfs repo");
     writeln_a(string_res::ARCHZFS_REPO_C, "/mnt/etc/pacman.conf")?;

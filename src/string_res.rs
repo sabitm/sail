@@ -5,6 +5,12 @@ INST_LINVAR=$(sed 's|.*linux|linux|' /proc/cmdline | sed 's|.img||g' | awk '{ pr
 pacman -Sy --needed --noconfirm ${INST_LINVAR} ${INST_LINVAR}-headers zfs-${INST_LINVAR} zfs-utils
 ";
 
+pub const IMPORT_ARCHZFS_KEYS_I: &str = r#"
+curl -L https://archzfs.com/archzfs.gpg |  pacman-key -a -
+pacman-key --lsign-key $(curl -L https://git.io/JsfVS)
+curl -L https://git.io/Jsfw2 > /etc/pacman.d/mirrorlist-archzfs
+"#;
+
 pub const ARCHZFS_REPO_C: &str = r"
 #[archzfs-testing]
 #Include = /etc/pacman.d/mirrorlist-archzfs
