@@ -5,11 +5,7 @@ use cradle::{
     output::StdoutTrimmed,
     run_output, run_result,
 };
-use std::{
-    fs::OpenOptions,
-    io::Write,
-    thread, time,
-};
+use std::{fs::OpenOptions, io::Write, thread, time};
 
 fn writeln_w(content: &str, path: &str) -> Result<()> {
     let mut path = OpenOptions::new()
@@ -23,10 +19,7 @@ fn writeln_w(content: &str, path: &str) -> Result<()> {
 }
 
 fn writeln_a(content: &str, path: &str) -> Result<()> {
-    let mut path = OpenOptions::new()
-        .append(true)
-        .create(true)
-        .open(path)?;
+    let mut path = OpenOptions::new().append(true).create(true).open(path)?;
     writeln!(path, "{}", content)?;
 
     Ok(())
@@ -331,7 +324,10 @@ pub fn system_configuration(sail: &Sail) -> Result<()> {
     run_result!(%"sed -i", exp, "/mnt/etc/pacman.conf")?;
 
     log("Generate kernel_updater script in /usr/local/bin");
-    writeln_w(string_res::KERNEL_UPDATER_S, "/mnt/usr/local/bin/kernel_updater")?;
+    writeln_w(
+        string_res::KERNEL_UPDATER_S,
+        "/mnt/usr/local/bin/kernel_updater",
+    )?;
     run_result!(%"chmod +x /mnt/usr/local/bin/kernel_updater")?;
 
     log("Enable zfs services");
@@ -385,7 +381,10 @@ pub fn workarounds() -> Result<()> {
     log("Grub canonical path fix");
     let canonical_fix_c = "export ZPOOL_VDEV_NAME_PATH=YES";
     let env_keep_c = r#"Defaults env_keep += "ZPOOL_VDEV_NAME_PATH""#;
-    writeln_w(canonical_fix_c, "/mnt/etc/profile.d/zpool_vdev_name_path.sh")?;
+    writeln_w(
+        canonical_fix_c,
+        "/mnt/etc/profile.d/zpool_vdev_name_path.sh",
+    )?;
     writeln_a(env_keep_c, "/mnt/etc/sudoers")?;
 
     log("Pool name missing fix");
@@ -430,13 +429,25 @@ pub fn bootloaders(sail: &Sail) -> Result<()> {
 
 pub fn finishing(sail: &Sail) -> Result<()> {
     log("Generate monthly scrub service");
-    writeln_w(string_res::SCRUB_TIMER_C, "/mnt/etc/systemd/system/zfs-scrub@.timer")?;
-    writeln_w(string_res::SCRUB_SERVICE_C, "/mnt/etc/systemd/system/zfs-scrub@.service")?;
+    writeln_w(
+        string_res::SCRUB_TIMER_C,
+        "/mnt/etc/systemd/system/zfs-scrub@.timer",
+    )?;
+    writeln_w(
+        string_res::SCRUB_SERVICE_C,
+        "/mnt/etc/systemd/system/zfs-scrub@.service",
+    )?;
 
     if sail.is_using_ssd() {
         log("Generate monthly trim service");
-        writeln_w(string_res::TRIM_TIMER_C, "/mnt/etc/systemd/system/zfs-trim@.timer")?;
-        writeln_w(string_res::TRIM_SERVICE_C, "/mnt/etc/systemd/system/zfs-trim@.service")?;
+        writeln_w(
+            string_res::TRIM_TIMER_C,
+            "/mnt/etc/systemd/system/zfs-trim@.timer",
+        )?;
+        writeln_w(
+            string_res::TRIM_SERVICE_C,
+            "/mnt/etc/systemd/system/zfs-trim@.service",
+        )?;
     }
 
     log("Enable systemd services");
