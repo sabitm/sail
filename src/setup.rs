@@ -216,14 +216,11 @@ pub fn pacstrap(sail: &Sail) -> Result<()> {
         "efibootmgr",
         "grub",
         "git",
-        "htop",
         "mandoc",
         "mkinitcpio",
-        "neovim",
         "networkmanager",
         "reflector",
         "sudo",
-        "zsh",
     ];
     let linux = sail.get_linvar();
     let linux_headers = linux.to_owned() + "-headers";
