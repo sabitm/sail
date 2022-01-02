@@ -226,7 +226,7 @@ rm -rf "$tmp_mpoint"
 
 pub const ADD_USER_S: &str = r"
 my_user=UserName
-useradd -m -G wheel -s /bin/zsh ${my_user}
+useradd -m -G wheel -s /bin/bash ${my_user}
 passwd ${my_user}
 ";
 
