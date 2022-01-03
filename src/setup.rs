@@ -218,6 +218,7 @@ pub fn pacstrap(sail: &Sail) -> Result<()> {
         "git",
         "mandoc",
         "mkinitcpio",
+        "nano",
         "networkmanager",
         "reflector",
         "sudo",
