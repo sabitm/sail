@@ -473,6 +473,7 @@ pub fn post_scripts_gen() -> Result<()> {
         ("add_user.sh", string_res::ADD_USER_S),
         ("enable_services.sh", string_res::ENABLE_SERVICES_S),
         ("nix_install.sh", string_res::NIX_INSTALL_S),
+        ("gnome_install.sh", string_res::GNOME_INSTALL_S),
         ("zfs_mount_generator.sh", string_res::ZFS_MOUNT_GENERATOR_S),
     ];
 

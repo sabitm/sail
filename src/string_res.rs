@@ -265,3 +265,8 @@ EOF
 
 echo "\nReboot as ${my_user} and execute /home/${my_user}/nix_channel_setup.sh"
 "#;
+
+pub const GNOME_INSTALL_S: &str = r"
+pacman -S gnome
+systemctl enable gdm.service
+";
