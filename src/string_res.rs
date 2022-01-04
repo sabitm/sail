@@ -274,7 +274,7 @@ echo 'export NIX_PATH=$HOME/.nix-defexpr/channels${NIX_PATH:+:}$NIX_PATH'
 nix-shell '<home-manager>' -A install
 EOF
 
-echo "\nReboot as ${my_user} and execute /home/${my_user}/nix_channel_setup.sh"
+echo -e "\nReboot as ${my_user} and execute /home/${my_user}/nix_channel_setup.sh"
 "#;
 
 pub const GNOME_INSTALL_S: &str = r"
