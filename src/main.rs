@@ -16,7 +16,7 @@ fn main() -> Result<()> {
         "4G",
     )?;
 
-    setup::command_checker()?;
+    setup::init_check()?;
     setup::check_as_root()?;
     setup::partition_disk(&sail)?;
     setup::format_disk(&sail)?;

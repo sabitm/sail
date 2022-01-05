@@ -2,7 +2,7 @@ use crate::{sail::Sail, string_res};
 use anyhow::{bail, Context, Result};
 use cradle::{
     input::{Split, Stdin},
-    output::StdoutTrimmed,
+    output::{StdoutTrimmed, Status},
     run_output, run_result,
 };
 use std::{fs::OpenOptions, io::Write, thread, time};
@@ -25,7 +25,8 @@ fn writeln_a(content: &str, path: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn command_checker() -> Result<()> {
+pub fn init_check() -> Result<()> {
+    // command checker
     let commands = [
         "arch-chroot",
         "awk",
@@ -57,6 +58,12 @@ pub fn command_checker() -> Result<()> {
 
     for cmd in commands {
         let StdoutTrimmed(_) = run_result!("which", cmd)?;
+    }
+
+    log("Check internet connection");
+    let (Status(exit_status), StdoutTrimmed(_)) = run_output!(%"curl -s --connect-timeout 3 http://google.com");
+    if ! exit_status.success() {
+        bail!("Connection error! Check your connection...");
     }
 
     Ok(())
