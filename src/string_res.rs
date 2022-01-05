@@ -178,8 +178,6 @@ systemctl enable zfs-trim@bpool.timer
 ";
 
 pub const ADDITIONAL_STORAGE_S: &str = r#"
-set -e
-
 my_user=UserName
 pool_name=tank0
 disk=/dev/disk/by-path/virtio-pci-0000:04:00.0-part1
@@ -189,6 +187,9 @@ dsets_mpoint_pair=(
     "dot_cache /home/${my_user}/.cache"
 )
 
+# ================ user input line separator ================ #
+
+set -e
 mkdir -p "$tmp_mpoint"
 
 zpool create \
@@ -226,6 +227,9 @@ rm -rf "$tmp_mpoint"
 
 pub const ADD_USER_S: &str = r"
 my_user=UserName
+
+# ================ user input line separator ================ #
+
 useradd -m -G wheel -s /bin/zsh ${my_user}
 passwd ${my_user}
 ";
@@ -236,6 +240,8 @@ systemctl enable zrepl
 
 pub const ZFS_MOUNT_GENERATOR_S: &str = r#"
 DATA_POOL='tank0 tank1'
+
+# ================ user input line separator ================ #
 
 # tab-separated zfs properties
 # see /etc/zfs/zed.d/history_event-zfs-list-cacher.sh
@@ -251,9 +257,11 @@ done
 "#;
 
 pub const NIX_INSTALL_S: &str = r#"
-set -e
 my_user=UserName
 
+# ================ user input line separator ================ #
+
+set -e
 pacman -S nix
 systemctl enable nix-daemon.service
 gpasswd -a "${my_user}" nix-users
@@ -275,7 +283,8 @@ export "NIX_PATH=\$HOME/.nix-defexpr/channels\${NIX_PATH:+:}\$NIX_PATH"
 
 nix-shell '<home-manager>' -A install
 
-echo -e "\nsource or add this command below to your shell"
+echo -e "\nsource nix_path.sh or add this command below to your shell"
+echo 'export NIX_PATH=\$HOME/.nix-defexpr/channels\${NIX_PATH:+:}\$NIX_PATH' > nix_path.sh
 echo 'export NIX_PATH=\$HOME/.nix-defexpr/channels\${NIX_PATH:+:}\$NIX_PATH'
 EOF
 
