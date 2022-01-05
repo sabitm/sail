@@ -226,7 +226,7 @@ rm -rf "$tmp_mpoint"
 
 pub const ADD_USER_S: &str = r"
 my_user=UserName
-useradd -m -G wheel -s /bin/bash ${my_user}
+useradd -m -G wheel -s /bin/zsh ${my_user}
 passwd ${my_user}
 ";
 
@@ -261,18 +261,25 @@ gpasswd -a "${my_user}" nix-users
 cat <<EOF > /home/"${my_user}"/nix_channel_add.sh
 nix-channel --add https://nixos.org/channels/nixpkgs-unstable
 nix-channel --update
+
+echo -e "\nPlease reboot before using nix"
 EOF
+
+chown "$my_user":"$my_user" /home/"${my_user}"/nix_channel_add.sh
 
 cat <<EOF > /home/"${my_user}"/home_manager_install.sh
 nix-channel --add https://github.com/nix-community/home-manager/archive/master.tar.gz home-manager
 nix-channel --update
 
-export NIX_PATH=$HOME/.nix-defexpr/channels${NIX_PATH:+:}$NIX_PATH
-echo "source or add this command below to your shell"
-echo 'export NIX_PATH=$HOME/.nix-defexpr/channels${NIX_PATH:+:}$NIX_PATH'
+export "NIX_PATH=\$HOME/.nix-defexpr/channels\${NIX_PATH:+:}\$NIX_PATH"
 
 nix-shell '<home-manager>' -A install
+
+echo -e "\nsource or add this command below to your shell"
+echo 'export NIX_PATH=\$HOME/.nix-defexpr/channels\${NIX_PATH:+:}\$NIX_PATH'
 EOF
+
+chown "$my_user":"$my_user" /home/"${my_user}"/home_manager_install.sh
 
 echo -e "\nReboot as ${my_user} and execute /home/${my_user}/nix_channel_setup.sh"
 "#;

@@ -219,9 +219,11 @@ pub fn pacstrap(sail: &Sail) -> Result<()> {
         "mandoc",
         "mkinitcpio",
         "nano",
+        "neovim",
         "networkmanager",
         "reflector",
         "sudo",
+        "zsh",
     ];
     let linux = sail.get_linvar();
     let linux_headers = linux.to_owned() + "-headers";
@@ -305,7 +307,7 @@ pub fn system_configuration(sail: &Sail) -> Result<()> {
 
     log("Set locale, timezone, keymap");
     run_result!(%"rm -f /mnt/etc/localtime")?;
-    run_result!(%"systemd-firstboot --root=/mnt --force --locale=en_US.UTF-8 --locale-messages=en_US.UTF-8 --keymap=us --timezone=Asia/Jakarta --hostname=lbox --root-password=123 --root-shell=/bin/bash")?;
+    run_result!(%"systemd-firstboot --root=/mnt --force --locale=en_US.UTF-8 --locale-messages=en_US.UTF-8 --keymap=us --timezone=Asia/Jakarta --hostname=lbox --root-password=123 --root-shell=/bin/zsh")?;
 
     log("Change root password using chroot");
     run_result!(%"arch-chroot /mnt passwd", Stdin("123\n123"))?;
