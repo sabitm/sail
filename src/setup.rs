@@ -2,7 +2,7 @@ use crate::{sail::Sail, string_res};
 use anyhow::{bail, Context, Result};
 use cradle::{
     input::{Split, Stdin},
-    output::{StdoutTrimmed, Status},
+    output::{Status, StdoutTrimmed},
     run_output, run_result,
 };
 use std::{fs::OpenOptions, io::Write, thread, time};
@@ -21,6 +21,16 @@ fn writeln_w(content: &str, path: &str) -> Result<()> {
 fn writeln_a(content: &str, path: &str) -> Result<()> {
     let mut path = OpenOptions::new().append(true).create(true).open(path)?;
     writeln!(path, "{}", content)?;
+
+    Ok(())
+}
+
+pub fn check_as_root() -> Result<()> {
+    let StdoutTrimmed(uid) = run_output!(%"id -u");
+
+    if uid != "0" {
+        bail!("Must be run as root!");
+    }
 
     Ok(())
 }
@@ -61,19 +71,10 @@ pub fn init_check() -> Result<()> {
     }
 
     log("Check internet connection");
-    let (Status(exit_status), StdoutTrimmed(_)) = run_output!(%"curl -s --connect-timeout 3 http://google.com");
-    if ! exit_status.success() {
+    let (Status(exit_status), StdoutTrimmed(_)) =
+        run_output!(%"curl -s --connect-timeout 3 http://google.com");
+    if !exit_status.success() {
         bail!("Connection error! Check your connection...");
-    }
-
-    Ok(())
-}
-
-pub fn check_as_root() -> Result<()> {
-    let StdoutTrimmed(uid) = run_output!(%"id -u");
-
-    if uid != "0" {
-        bail!("Must be run as root!");
     }
 
     Ok(())
