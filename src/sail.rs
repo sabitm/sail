@@ -1,7 +1,11 @@
 use anyhow::Result;
 use anyhow::{bail, Context};
+use cradle::output::Status;
+use cradle::run_result;
+use serde_derive::{Deserialize, Serialize};
 use std::{fs, path::Path};
 
+#[derive(Debug, Serialize, Deserialize)]
 pub enum LinuxVariant {
     Linux,
     LinuxLts,
@@ -9,14 +13,34 @@ pub enum LinuxVariant {
     LinuxHardened,
 }
 
+impl Default for LinuxVariant {
+    fn default() -> Self {
+        LinuxVariant::Linux
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub enum ZfsType {
     Normal,
     Dkms,
 }
 
+impl Default for ZfsType {
+    fn default() -> Self {
+        ZfsType::Normal
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub enum StorageType {
     Ssd,
     Hdd,
+}
+
+impl Default for StorageType {
+    fn default() -> Self {
+        StorageType::Ssd
+    }
 }
 
 pub struct Sail {
@@ -34,9 +58,9 @@ impl Sail {
         linvar: LinuxVariant,
         zfs_type: ZfsType,
         storage_type: StorageType,
-        disk: &str,
-        partsize_esp: &str,
-        partsize_bpool: &str,
+        disk: String,
+        partsize_esp: String,
+        partsize_bpool: String,
     ) -> Result<Self> {
         let linvar = match linvar {
             LinuxVariant::Linux => "linux",
@@ -51,13 +75,35 @@ impl Sail {
                 ZfsType::Dkms => "dkms",
             };
 
+        let block_test = "test -b ".to_owned() + &disk;
+        let Status(block_status) = run_result!(%"bash -c", block_test)?;
+        if !block_status.success() {
+            bail!("{} is not a block device!", &disk);
+        }
+
+        for partsize in [&partsize_esp, &partsize_bpool] {
+            let mut partsize_c = partsize.clone();
+            if let Some(unit) = partsize_c.pop() {
+                match unit {
+                    'K' | 'M' | 'G' | 'T' | 'P' => {}
+                    _ => bail!(
+                        r#""{}" isn't a valid unit in partsize_* (K, M, G, T, P)"#,
+                        partsize
+                    ),
+                }
+            }
+            partsize_c
+                .parse::<usize>()
+                .context("Invalid partsize_* size")?;
+        }
+
         Ok(Self {
             inst_linvar: linvar.to_owned(),
             inst_zfs,
             disk: disk.to_owned(),
             inst_partsize_esp: partsize_esp.to_owned(),
             inst_partsize_bpool: partsize_bpool.to_owned(),
-            next_partnum: Self::_get_next_partnum(disk)?,
+            next_partnum: Self::_get_next_partnum(&disk)?,
             storage_type,
         })
     }
