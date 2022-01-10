@@ -7,4 +7,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.47"
+argh = "0.1.7"
+confy = "0.4.0"
 cradle = "0.2.0"
+serde = "1.0.133"
+serde_derive = "1.0.133"
