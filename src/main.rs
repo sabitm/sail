@@ -1,23 +1,17 @@
+mod parse_args;
+mod parse_conf;
 mod sail;
 mod setup;
 mod string_res;
 
 use crate::sail::Sail;
 use anyhow::Result;
-use sail::{LinuxVariant, StorageType, ZfsType};
+use parse_args::SailState;
+use sail::{StorageType, ZfsType};
 
-fn main() -> Result<()> {
-    let sail = Sail::new(
-        LinuxVariant::LinuxLts,
-        ZfsType::Normal,
-        StorageType::Ssd,
-        "/dev/disk/by-path/virtio-pci-0000:04:00.0",
-        "1G",
-        "4G",
-    )?;
-
-    setup::init_check()?;
+fn start(sail: Sail) -> Result<()> {
     setup::check_as_root()?;
+    setup::init_check()?;
     setup::partition_disk(&sail)?;
     setup::format_disk(&sail)?;
     setup::pacstrap(&sail)?;
@@ -28,6 +22,18 @@ fn main() -> Result<()> {
     setup::finishing(&sail)?;
     setup::post_scripts_gen()?;
     setup::shot_and_clean()?;
+
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    match parse_args::parse_args()? {
+        SailState::Start => {
+            start(parse_conf::parse_conf()?)?;
+        }
+        SailState::Exec => {}
+        SailState::List => {}
+    }
 
     Ok(())
 }
