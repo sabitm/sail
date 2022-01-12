@@ -336,7 +336,7 @@ pub fn system_configuration(sail: &Sail) -> Result<()> {
     run_result!(%"chmod +x /mnt/usr/local/bin/kernel_updater")?;
 
     log("Enable zfs services");
-    run_result!(%"systemctl enable zfs-import-scan.service zfs-import.target zfs-zed zfs.target --root=/mnt")?;
+    run_result!(%"systemctl enable zfs-import-cache.service zfs-import.target zfs-zed zfs.target --root=/mnt")?;
     run_result!(%"systemctl disable zfs-mount --root=/mnt")?;
 
     log("Apply locales");

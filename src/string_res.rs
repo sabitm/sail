@@ -87,10 +87,8 @@ jobs:
 "#;
 
 pub const GEN_INITRD_I: &str = r"
-rm -f /etc/zfs/zpool.cache
-touch /etc/zfs/zpool.cache
-chmod a-w /etc/zfs/zpool.cache
-chattr +i /etc/zfs/zpool.cache
+zpool set cachefile=/etc/zfs/zpool.cache rpool
+zpool set cachefile=/etc/zfs/zpool.cache bpool
 mkinitcpio -P
 ";
 
@@ -221,6 +219,7 @@ for pair in "${dsets_mpoint_pair[@]}"; do
     echo "${pool_name}/arch/DATA/default/$dset  $mpoint zfs x-systemd.automount,noauto,zfsutil,rw,xattr,posixacl   0 0" >> /etc/fstab
 done
 
+zpool set cachefile=/etc/zfs/zpool.cache "$pool_name"
 zpool export "$pool_name"
 rm -rf "$tmp_mpoint"
 "#;
