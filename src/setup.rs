@@ -283,13 +283,9 @@ pub fn pacstrap(sail: &Sail) -> Result<()> {
 pub fn system_configuration(sail: &Sail) -> Result<()> {
     let arch_chroot = Split("arch-chroot /mnt bash --login");
 
-    log("Set mkinitcpio zfs hook scan path");
-    let grub_cmdline_c = format!(
-        r#"{}GRUB_CMDLINE_LINUX="zfs_import_dir={}""#,
-        "GRUB_DISABLE_OS_PROBER=false\n",
-        sail.get_disk_parent()?
-    );
-    writeln_a(&grub_cmdline_c, "/mnt/etc/default/grub")?;
+    log("Set grub flag to use os-prober");
+    let grub_osprober_c = "GRUB_DISABLE_OS_PROBER=false\n";
+    writeln_a(grub_osprober_c, "/mnt/etc/default/grub")?;
 
     log("Generate fstab");
     let StdoutTrimmed(out) = run_result!(%"genfstab -U /mnt")?;
