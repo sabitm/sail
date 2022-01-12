@@ -229,6 +229,7 @@ pub fn pacstrap(sail: &Sail) -> Result<()> {
         "nano",
         "neovim",
         "networkmanager",
+        "os-prober",
         "reflector",
         "sudo",
         "zsh",
