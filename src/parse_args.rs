@@ -1,7 +1,7 @@
 use crate::parse_conf;
 use anyhow::Result;
 use argh::FromArgs;
-use std::{env, path::Path};
+use std::path::Path;
 
 pub enum SailState {
     Start,

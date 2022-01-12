@@ -165,21 +165,8 @@ impl Sail {
         Ok(suffix)
     }
 
-    pub fn get_disk_parent(&self) -> Result<&str> {
-        let disk_path = Path::new(&self.disk);
-        let disk_parent = disk_path
-            .parent()
-            .context("get the parent directory of $disk")?;
-        let disk_parent = disk_parent
-            .to_str()
-            .context("convert disk parent Path to str")?;
-
-        Ok(disk_parent)
-    }
-
     pub fn get_next_partnum(&self) -> usize {
         self.next_partnum
-        // 1
     }
 
     fn _get_next_partnum(disk: &str) -> Result<usize> {
