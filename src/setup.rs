@@ -202,6 +202,7 @@ pub fn format_disk(sail: &Sail) -> Result<()> {
     run_result!(%"zfs create -o canmount=on rpool/arch/DATA/default/var/www")?;
     log("For GNOME");
     run_result!(%"zfs create -o canmount=on rpool/arch/DATA/default/var/lib/AccountsService")?;
+    run_result!(%"chmod 775 /mnt/var/lib/AccountsService")?;
     log("For Docker");
     run_result!(%"zfs create -o canmount=on rpool/arch/DATA/default/var/lib/docker")?;
     log("For NFS");
