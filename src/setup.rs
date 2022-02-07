@@ -368,6 +368,9 @@ pub fn install_aurs() -> Result<()> {
     log("Install pacman hook for BEM");
     let bieaz_pachook_install_i = string_res::BIEAZ_PACHOOK_INSTALL_I;
     run_result!(&arch_chroot, Stdin(bieaz_pachook_install_i))?;
+    log("Add env_keep for rozb3 skip");
+    let env_keep_c = r#"Defaults env_keep += "ROZB3_PAC_SKIP""#;
+    writeln_a(env_keep_c, "/mnt/etc/sudoers")?;
 
     log("Install zrepl auto snapshotter");
     let zrepl_install_i = string_res::ZREPL_INSTALL_I;
