@@ -55,6 +55,7 @@ pub fn init_check() -> Result<()> {
         "mv",
         "pacman",
         "pacstrap",
+        "partprobe",
         "rm",
         "sed",
         "sgdisk",
@@ -113,6 +114,9 @@ pub fn partition_disk(sail: &Sail) -> Result<()> {
     let part_desc = format!("-n{}:0:0", rpool_partnum);
     let part_type = format!("-t{}:BF00", rpool_partnum);
     run_result!(%"sgdisk", part_desc, part_type, disk)?;
+
+    log("Resync partition table");
+    run_result!("partprobe")?;
 
     thread::sleep(some_delay);
     Ok(())
