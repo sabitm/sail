@@ -86,7 +86,7 @@ fn log(content: &str) {
 }
 
 pub fn partition_disk(sail: &Sail) -> Result<()> {
-    let some_delay = time::Duration::from_secs(1);
+    let some_delay = time::Duration::from_secs(5);
 
     let disk = sail.get_disk();
     let partsize_esp = sail.get_partsize_esp();
