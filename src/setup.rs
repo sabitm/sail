@@ -132,6 +132,7 @@ pub fn format_disk(sail: &Sail) -> Result<()> {
 
     log("Create boot pool");
     run_result!(%"zpool create",
+        "-f",
         %"-o compatibility=grub2",
         %"-o ashift=12",
         %"-o autotrim=on",
@@ -149,6 +150,7 @@ pub fn format_disk(sail: &Sail) -> Result<()> {
 
     log("Create root pool");
     run_result!(%"zpool create",
+        "-f",
         %"-o ashift=12",
         %"-o autotrim=on",
         %"-R /mnt",
