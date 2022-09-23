@@ -92,14 +92,15 @@ zpool set cachefile=/etc/zfs/zpool.cache bpool
 mkinitcpio -P
 ";
 
-pub const GRUB_INSTALL_I: &str = r"
-grub-install --boot-directory /boot/efi/EFI/arch --efi-directory /boot/efi/
-grub-install --boot-directory /boot/efi/EFI/arch --efi-directory /boot/efi/ --removable
+pub const GRUB_INSTALL_2I: &str = r"
+grub-install --target x86_64-efi --boot-directory \
+    /boot/efi/arch/grub-bootdir/x86_64-efi/ --efi-directory \
+    /boot/efi --bootloader-id arch --removable
 ";
 
 pub const GRUB_MENU_I: &str = r"
-grub-mkconfig -o /boot/efi/EFI/arch/grub/grub.cfg
-cp /boot/efi/EFI/arch/grub/grub.cfg /boot/grub/grub.cfg
+grub-mkconfig -o /boot/efi/arch/grub-bootdir/x86_64-efi/grub/grub.cfg
+grub-mkconfig -o /boot/efi/arch/grub-bootdir/i386-pc/grub/grub.cfg
 ";
 
 pub const MIRROR_ESP_I: &str = r"

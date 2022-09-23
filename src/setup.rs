@@ -5,7 +5,7 @@ use cradle::{
     output::{Status, StdoutTrimmed},
     run_output, run_result,
 };
-use std::{fs::OpenOptions, io::Write, thread, time};
+use std::{fs::OpenOptions, io::Write, thread, time, env};
 
 fn writeln_w(content: &str, path: &str) -> Result<()> {
     let mut path = OpenOptions::new()
@@ -228,7 +228,6 @@ pub fn pacstrap(sail: &Sail) -> Result<()> {
         "base",
         "base-devel",
         "dosfstools",
-        "efibootmgr",
         "grub",
         "git",
         "mandoc",
@@ -403,9 +402,12 @@ pub fn workarounds() -> Result<()> {
     writeln_a(env_keep_c, "/mnt/etc/sudoers")?;
 
     log("Pool name missing fix");
-    let exp =
-        r"s/rpool=.*/rpool=`zdb -l ${GRUB_DEVICE} | grep -E '[[:blank:]]name' | cut -d\\' -f 2`/";
+    let exp = r"s|rpool=.*|rpool=rpool|";
     run_result!(%"sed -i", exp, "/mnt/etc/grub.d/10_linux")?;
+
+    log("Add zfs_import_dir to GRUB");
+    let zfs_import_dir_c = r#"GRUB_CMDLINE_LINUX="zfs_import_dir=/dev/disk/by-id/""#;
+    writeln_a(zfs_import_dir_c, "/mnt/etc/default/grub")?;
 
     Ok(())
 }
@@ -417,18 +419,20 @@ pub fn bootloaders(sail: &Sail) -> Result<()> {
     let gen_initrd_i = string_res::GEN_INITRD_I;
     run_result!(&arch_chroot, Stdin(gen_initrd_i))?;
 
+    log("Set ZPOOL_VDEV_NAME_PATH workaround");
+    env::set_var("ZPOOL_VDEV_NAME_PATH", "YES");
+
     log("Create grub boot dir, in esp and boot pool");
-    run_result!(%"mkdir -p /mnt/boot/efi/EFI/arch")?;
-    run_result!(%"mkdir -p /mnt/boot/grub")?;
+    run_result!(%"mkdir -p /mnt/boot/efi/arch/grub-bootdir/i386-pc/")?;
+    run_result!(%"mkdir -p /mnt/boot/efi/arch/grub-bootdir/x86_64-efi/")?;
 
     log("Install grub efi");
-    let grub_install_i = string_res::GRUB_INSTALL_I;
-    let efibootmgr_i = format!(
-        r#"efibootmgr -cgp 1 -l "\EFI\arch\grubx64.efi" -L "arch-{}" -d {}"#,
-        sail.get_disk_last_path()?,
+    let grub_install_2i = string_res::GRUB_INSTALL_2I;
+    let grub_install_1i = format!(
+        "grub-install --target=i386-pc --boot-directory /boot/efi/arch/grub-bootdir/i386-pc/ {}",
         sail.get_disk()
     );
-    let grub_setup_i = [grub_install_i, &efibootmgr_i, "\n"].concat();
+    let grub_setup_i = [&grub_install_1i, grub_install_2i, "\n"].concat();
     run_result!(&arch_chroot, Stdin(grub_setup_i))?;
 
     log("Generate grub menu");
